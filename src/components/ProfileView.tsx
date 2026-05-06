@@ -34,6 +34,13 @@ interface ProfileViewProps {
   onDepositClick: () => void;
   onWithdrawClick: () => void;
   onLogout: () => void;
+  onRewardsClick: () => void;
+  onSecurityClick: () => void;
+  onSettingsClick: () => void;
+  onNotificationsClick: () => void;
+  onAboutClick: () => void;
+  onLanguageClick: () => void;
+  onBalanceDetailsClick: () => void;
 }
 
 export default function ProfileView({ 
@@ -45,7 +52,14 @@ export default function ProfileView({
   onInviteClick,
   onDepositClick,
   onWithdrawClick,
-  onLogout
+  onLogout,
+  onRewardsClick,
+  onSecurityClick,
+  onSettingsClick,
+  onNotificationsClick,
+  onAboutClick,
+  onLanguageClick,
+  onBalanceDetailsClick
 }: ProfileViewProps) {
   const [showBalance, setShowBalance] = useState(true);
   const referralLink = `https://sport91fc.com?ref=${profile?.uid?.slice(0, 8) || '000000'}`;
@@ -55,18 +69,18 @@ export default function ProfileView({
   };
 
   const services = [
-    { icon: Gift, label: t.prizes, color: 'text-emerald-400', bg: 'bg-emerald-400/10' },
-    { icon: Shield, label: t.security, color: 'text-blue-400', bg: 'bg-blue-400/10' },
-    { icon: Wallet, label: t.wallet, color: 'text-amber-400', bg: 'bg-amber-400/10' },
-    { icon: Settings, label: t.settings, color: 'text-cyan-400', bg: 'bg-cyan-400/10' },
-    { icon: CalendarCheck, label: t.checkIn, color: 'text-orange-400', bg: 'bg-orange-400/10' },
-    { icon: Trophy, label: t.results, color: 'text-yellow-400', bg: 'bg-yellow-400/10' },
-    { icon: Users, label: t.myTeam, color: 'text-brand-primary', bg: 'bg-brand-primary/10', onClick: () => {} },
-    { icon: Bell, label: t.notifications, color: 'text-blue-500', bg: 'bg-blue-500/10' },
+    { icon: Gift, label: t.prizes, color: 'text-emerald-400', bg: 'bg-emerald-400/10', onClick: onRewardsClick },
+    { icon: Shield, label: t.security, color: 'text-blue-400', bg: 'bg-blue-400/10', onClick: onSecurityClick },
+    { icon: Wallet, label: t.wallet, color: 'text-amber-400', bg: 'bg-amber-400/10', onClick: onDepositClick },
+    { icon: Settings, label: t.settings, color: 'text-cyan-400', bg: 'bg-cyan-400/10', onClick: onSettingsClick },
+    { icon: CalendarCheck, label: t.checkIn, color: 'text-orange-400', bg: 'bg-orange-400/10', onClick: onRewardsClick },
+    { icon: Trophy, label: t.results, color: 'text-yellow-400', bg: 'bg-yellow-400/10', onClick: onBetHistoryClick },
+    { icon: Users, label: t.myTeam, color: 'text-brand-primary', bg: 'bg-brand-primary/10', onClick: onInviteClick },
+    { icon: Bell, label: t.notifications, color: 'text-blue-500', bg: 'bg-blue-500/10', onClick: onNotificationsClick },
     { icon: History, label: t.history, color: 'text-emerald-500', bg: 'bg-emerald-500/10', onClick: onBetHistoryClick },
     { icon: UserPlus, label: t.invite, color: 'text-brand-primary', bg: 'bg-brand-primary/10', onClick: onInviteClick },
     { icon: Headphones, label: t.support, color: 'text-cyan-500', bg: 'bg-cyan-500/10', onClick: onSupportClick },
-    { icon: Info, label: t.aboutUs, color: 'text-emerald-400', bg: 'bg-emerald-400/10' },
+    { icon: Info, label: t.aboutUs, color: 'text-emerald-400', bg: 'bg-emerald-400/10', onClick: onAboutClick },
   ];
 
   return (
@@ -88,15 +102,15 @@ export default function ProfileView({
                   />
                </div>
             </div>
-            <div className="absolute -bottom-1 -right-1 bg-white/10 backdrop-blur-md rounded-full px-2 py-0.5 border border-white/20">
-               <span className="text-[10px] font-black italic text-brand-primary">VIP{profile?.vipLevel || 0}</span>
+            <div className="absolute -bottom-1 -right-1 bg-white/10 backdrop-blur-md rounded-full px-2 py-1 border border-white/20">
+               <span className="text-xs font-black italic text-brand-primary">VIP{profile?.vipLevel || 0}</span>
             </div>
          </div>
          <div className="flex-1">
             <div className="flex items-center gap-2">
-               <h2 className="text-xl font-black text-white italic">{profile?.displayName || 'Guest'}</h2>
-               <div className="flex items-center gap-1 bg-white/5 border border-white/10 rounded px-1.5 py-0.5">
-                  <span className="text-[8px] font-black text-brand-primary italic">VIP{profile?.vipLevel || 0}</span>
+               <h2 className="text-2xl font-black text-white italic">{profile?.displayName || 'Guest'}</h2>
+               <div className="flex items-center gap-1 bg-white/5 border border-white/10 rounded px-2 py-0.5">
+                  <span className="text-[10px] font-black text-brand-primary italic">VIP{profile?.vipLevel || 0}</span>
                </div>
             </div>
             <div className="flex items-center gap-2 mt-1">
@@ -106,8 +120,11 @@ export default function ProfileView({
                </button>
             </div>
          </div>
-         <button className="bg-white/5 border border-white/10 rounded-full px-3 py-1 flex items-center gap-2">
-            <span className="text-[10px] font-bold text-white">ES</span>
+         <button 
+           onClick={onLanguageClick}
+           className="bg-white/5 border border-white/10 rounded-full px-3 py-1 flex items-center gap-2 active:scale-95 transition-all"
+         >
+            <span className="text-[10px] font-bold text-white uppercase">{t.languageCode || 'ES'}</span>
             <div className="w-1.5 h-1.5 bg-brand-primary rounded-full" />
          </button>
       </div>
@@ -117,13 +134,16 @@ export default function ProfileView({
          <div className="relative z-10 space-y-6 sm:space-y-8">
             <div className="flex justify-between items-center">
                <div className="flex items-center gap-3">
-                  <span className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500">{t.availableBalance}</span>
+                  <span className="text-xs font-black uppercase tracking-[0.2em] text-gray-500">{t.availableBalance}</span>
                   <button onClick={() => setShowBalance(!showBalance)} className="text-gray-500 hover:text-white transition-colors">
-                     {showBalance ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                     {showBalance ? <Eye className="w-5 h-5" /> : <EyeOff className="w-5 h-5" />}
                   </button>
                </div>
-               <button className="flex items-center gap-1 text-[9px] font-black text-brand-primary uppercase tracking-widest hover:translate-x-1 transition-transform">
-                  {t.details} <ChevronRight className="w-3 h-3" />
+               <button 
+                 onClick={onBalanceDetailsClick}
+                 className="flex items-center gap-1 text-[10px] font-black text-brand-primary uppercase tracking-widest hover:translate-x-1 transition-transform"
+               >
+                  {t.details} <ChevronRight className="w-4 h-4" />
                </button>
             </div>
 
@@ -136,16 +156,16 @@ export default function ProfileView({
 
             <div className="grid grid-cols-3 gap-2 sm:gap-4 pt-4 border-t border-white/5">
                <div>
-                  <p className="text-[8px] font-black text-gray-500 uppercase tracking-widest mb-1">{t.unliquidated}</p>
-                  <p className="text-xs sm:text-sm font-black italic text-white">{showBalance ? formatCurrency(profile?.unliquidated || 0) : '0.00'}</p>
+                  <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">{t.unliquidated}</p>
+                  <p className="text-sm sm:text-base font-black italic text-white">{showBalance ? formatCurrency(profile?.unliquidated || 0) : '0.00'}</p>
                </div>
                <div>
-                  <p className="text-[8px] font-black text-gray-500 uppercase tracking-widest mb-1">{t.todayProfit}</p>
-                  <p className="text-xs sm:text-sm font-black italic text-white">{showBalance ? formatCurrency(profile?.todayProfit || 0) : '0.00'}</p>
+                  <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">{t.todayProfit}</p>
+                  <p className="text-sm sm:text-base font-black italic text-white">{showBalance ? formatCurrency(profile?.todayProfit || 0) : '0.00'}</p>
                </div>
                <div>
-                  <p className="text-[8px] font-black text-gray-500 uppercase tracking-widest mb-1">{t.weeklyProfit}</p>
-                  <p className="text-xs sm:text-sm font-black italic text-white">{showBalance ? formatCurrency(profile?.weeklyProfit || 0) : '0.00'}</p>
+                  <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">{t.weeklyProfit}</p>
+                  <p className="text-sm sm:text-base font-black italic text-white">{showBalance ? formatCurrency(profile?.weeklyProfit || 0) : '0.00'}</p>
                </div>
             </div>
          </div>

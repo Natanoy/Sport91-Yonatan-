@@ -55,7 +55,7 @@ export default function WithdrawModal({ onClose, onWithdraw, profile, t }: Withd
   const netAmount = Math.max(0, currentAmount - withdrawalFee);
 
   return (
-    <div className="fixed inset-0 z-[100] bg-brand-bg flex flex-col">
+    <div className="fixed inset-0 z-[2100] bg-brand-bg flex flex-col">
       {/* Header */}
       <div className="h-20 flex items-center justify-between px-6 border-b border-white/5">
         <button 

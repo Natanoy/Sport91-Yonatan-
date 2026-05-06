@@ -39,9 +39,9 @@ export default function Navbar({ onShowSupport }: NavbarProps) {
         {!user && (
           <button
             onClick={loginWithGoogle}
-            className="flex items-center gap-2 bg-brand-primary hover:bg-brand-primary/90 text-black px-5 py-2.5 rounded-xl font-black italic transition-all active:scale-95 shadow-lg shadow-brand-primary/20"
+            className="flex items-center gap-2 bg-brand-primary hover:bg-brand-primary/90 text-black px-6 py-3 rounded-xl font-black italic transition-all active:scale-95 shadow-lg shadow-brand-primary/20 text-sm"
           >
-            <LogIn className="w-4 h-4" />
+            <LogIn className="w-5 h-5" />
             {t.login}
           </button>
         )}

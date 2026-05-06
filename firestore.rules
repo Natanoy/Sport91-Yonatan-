@@ -17,14 +17,15 @@ service cloud.firestore {
 
     function isAdmin() {
       return isSignedIn() && (
-        request.auth.token.email == 'ortegayonatan426@gmail.com' ||
+        (request.auth.token.email == 'ortegayonatan426@gmail.com') ||
         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'user') == 'admin')
-      ) && request.auth.token.email_verified == true;
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'user') == 'admin' &&
+         request.auth.token.email_verified == true)
+      );
     }
 
     function isBootstrapAdmin() {
-      return isSignedIn() && request.auth.token.email == 'ortegayonatan426@gmail.com' && request.auth.token.email_verified == true;
+      return isSignedIn() && request.auth.token.email == 'ortegayonatan426@gmail.com';
     }
 
     function isValidId(id) {
@@ -42,7 +43,8 @@ service cloud.firestore {
     // --- Validation Blueprints ---
     function isValidUser(data) {
       return data.keys().hasAll(['uid', 'email', 'displayName', 'balance', 'createdAt']) &&
-             data.keys().size() == 5 &&
+             data.keys().size() >= 5 &&
+             data.keys().size() <= 8 &&
              data.uid == request.auth.uid &&
              data.email == request.auth.token.email &&
              data.displayName is string &&
@@ -99,11 +101,14 @@ service cloud.firestore {
         // Action: Daily Check-In
         (incoming().diff(existing()).affectedKeys().hasOnly(['balance', 'checkInStreak', 'lastCheckInDate', 'updatedAt']) &&
         incoming().balance >= existing().balance &&
-        incoming().checkInStreak >= existing().checkInStreak &&
+        incoming().get('checkInStreak', 0) >= existing().get('checkInStreak', 0) &&
         incoming().updatedAt == request.time) ||
         // Action: Lucky Box
         (incoming().diff(existing()).affectedKeys().hasOnly(['balance', 'lastLuckyBoxClaim', 'lotteryTickets', 'updatedAt']) &&
         isValidLuckyBox(incoming())) ||
+        // Action: Bet payout / Deposit (Increase balance)
+        (incoming().diff(existing()).affectedKeys().hasOnly(['balance']) &&
+        incoming().balance > existing().balance) ||
         // Action: Withdrawal (Decrease balance)
         (incoming().diff(existing()).affectedKeys().hasOnly(['balance']) &&
         incoming().balance < existing().balance)

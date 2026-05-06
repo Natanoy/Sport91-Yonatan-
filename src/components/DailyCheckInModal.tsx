@@ -57,7 +57,7 @@ export default function DailyCheckInModal({ onClose, profile, t }: DailyCheckInM
   const days = Array.from({ length: 30 }, (_, i) => i + 1);
 
   return (
-    <div className="fixed inset-0 z-[110] bg-brand-bg flex flex-col">
+    <div className="fixed inset-0 z-[2100] bg-brand-bg flex flex-col">
       {/* Header */}
       <div className="h-20 flex items-center justify-between px-6 border-b border-white/5">
         <button 
@@ -145,7 +145,7 @@ export default function DailyCheckInModal({ onClose, profile, t }: DailyCheckInM
       </div>
 
       {/* Fixed bottom button */}
-      <div className="p-6 bg-brand-bg/80 backdrop-blur-xl border-t border-white/5">
+      <div className="p-6 pb-12 bg-brand-bg/80 backdrop-blur-xl border-t border-white/5">
         <button
           onClick={handleClaim}
           disabled={!canClaim || loading}

@@ -40,7 +40,7 @@ export default function VipModal({ onClose, profile, t }: VipModalProps) {
     : 100;
 
   return (
-    <div className="fixed inset-0 z-[100] bg-brand-bg flex flex-col font-sans overflow-hidden">
+    <div className="fixed inset-0 z-[2100] bg-brand-bg flex flex-col font-sans overflow-hidden">
       {/* Header */}
       <div className="h-20 flex items-center justify-between px-6 border-b border-white/5 shrink-0">
         <button 

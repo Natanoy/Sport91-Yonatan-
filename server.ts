@@ -27,27 +27,30 @@ async function startServer() {
     }
 
     // Extract target path relative to /api/football/
-    const targetPath = req.url.split('/api/football/')[1];
+    // originalUrl is the full path from the root, e.g., /api/football/fixtures?live=all
+    const parts = req.originalUrl.split('/api/football/');
+    const targetPath = parts.length > 1 ? parts[1] : null;
 
     if (!targetPath) {
-      console.warn('No target path found in URL:', req.url);
+      console.warn('No target path found in originalUrl:', req.originalUrl);
       return res.status(400).json({ error: 'No endpoint specified' });
     }
 
     const url = `https://v3.football.api-sports.io/${targetPath}`;
 
     try {
-      console.log(`Proxying ${req.method} request to: ${url}`);
+      console.log(`[Proxy] ${req.method} ${req.originalUrl} -> ${url}`);
       const response = await fetch(url, {
         method: req.method,
         headers: {
-          'x-rapidapi-key': apiKey,
+          'x-rapidapi-key': apiKey.trim(),
           'x-rapidapi-host': 'v3.football.api-sports.io',
-          'Content-Type': 'application/json'
+          'Accept': 'application/json'
         },
         body: ['POST', 'PUT', 'PATCH'].includes(req.method) ? JSON.stringify(req.body) : undefined
       });
 
+      console.log(`[Proxy] Received ${response.status} from Football API`);
       const contentType = response.headers.get('content-type');
       if (contentType && contentType.includes('application/json')) {
         const data = await response.json();

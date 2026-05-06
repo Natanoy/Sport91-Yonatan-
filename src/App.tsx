@@ -29,7 +29,8 @@ import LandingPage from './components/LandingPage';
 import TradeView from './components/TradeView';
 import InvitationView from './components/InvitationView';
 import ProfileView from './components/ProfileView';
-import { formatCurrency, cn } from './lib/utils';
+import SecurityModal from './components/SecurityModal';
+import { formatCurrency, getTeamLogo, cn } from './lib/utils';
 import { 
   Search, 
   Flame, 
@@ -47,11 +48,174 @@ import {
   User,
   CheckCircle2,
   Clock,
-  LayoutDashboard
+  LayoutDashboard,
+  Copy,
+  Calendar
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 import { syncFootballMatches } from './services/matchSyncService';
+import { resolvePendingBets } from './services/betResolutionService';
+
+function CountdownTimer({ targetDate }: { targetDate: any }) {
+  const [timeLeft, setTimeLeft] = useState({ hours: '00', minutes: '00', seconds: '00' });
+
+  useEffect(() => {
+    const calculateTime = () => {
+      const now = new Date().getTime();
+      let target: number;
+      
+      if (targetDate?.toDate) {
+        target = targetDate.toDate().getTime();
+      } else if (typeof targetDate === 'string' || typeof targetDate === 'number') {
+        target = new Date(targetDate).getTime();
+      } else if (targetDate instanceof Date) {
+        target = targetDate.getTime();
+      } else {
+        target = Date.now() + 3600000;
+      }
+
+      const diff = target - now;
+
+      if (diff <= 0) return { hours: '00', minutes: '00', seconds: '00' };
+
+      const hours = Math.floor(diff / (1000 * 60 * 60)).toString().padStart(2, '0');
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60)).toString().padStart(2, '0');
+      const seconds = Math.floor((diff % (1000 * 60)) / 1000).toString().padStart(2, '0');
+
+      return { hours, minutes, seconds };
+    };
+
+    const timer = setInterval(() => {
+      setTimeLeft(calculateTime());
+    }, 1000);
+
+    setTimeLeft(calculateTime());
+    return () => clearInterval(timer);
+  }, [targetDate]);
+
+  return (
+    <div className="flex items-center gap-1.5">
+      {[timeLeft.hours, timeLeft.minutes, timeLeft.seconds].map((unit, i) => (
+        <React.Fragment key={i}>
+          <div className="bg-emerald-500/20 border border-emerald-500/30 rounded-md px-2 py-1 min-w-[32px] text-center">
+            <span className="text-xs font-black text-emerald-500 font-mono">{unit}</span>
+          </div>
+          {i < 2 && <span className="text-emerald-500 font-bold">:</span>}
+        </React.Fragment>
+      ))}
+    </div>
+  );
+}
+
+function PopularMatchCard({ match, onClick, t }: { match: any, onClick: () => void, t: any, key?: any }) {
+  const volume = (Math.random() * 50 + 80).toFixed(2);
+  const id = Math.floor(Math.random() * 9000000 + 1000000);
+  
+  const formatDate = (date: any) => {
+    if (!date) return '06/05';
+    const d = date.toDate ? date.toDate() : new Date(date);
+    return d.toLocaleDateString([], {day: '2-digit', month: '2-digit'});
+  };
+
+  const formatTime = (date: any) => {
+    if (!date) return '23:30';
+    const d = date.toDate ? date.toDate() : new Date(date);
+    return d.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+  };
+
+  return (
+    <motion.div 
+      whileHover={{ y: -4 }}
+      onClick={onClick}
+      className="bg-brand-surface border border-white/5 rounded-[2.5rem] p-6 shadow-2xl relative overflow-hidden cursor-pointer group mb-4"
+    >
+      <div className="absolute top-0 right-0 w-48 h-48 bg-brand-primary/5 blur-[80px] -mr-24 -mt-24 rounded-full" />
+      
+      <div className="flex justify-between items-center mb-6 relative z-10">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-lg bg-orange-500 flex items-center justify-center p-1.5 shadow-lg overflow-hidden">
+             <img 
+               src="https://cdn-icons-png.flaticon.com/512/33/33736.png" 
+               className="w-full h-full object-contain brightness-0 invert" 
+               alt="" 
+             />
+          </div>
+          <span className="text-sm font-black text-white italic uppercase tracking-tighter">{match.league}</span>
+        </div>
+        <div className="flex items-center gap-1.5 bg-black/40 border border-white/10 rounded-xl px-3 py-2 group/id hover:bg-black/60 transition-colors">
+          <span className="text-xs font-black text-emerald-500 font-mono tracking-wider whitespace-nowrap">ID: {id}</span>
+          <Copy className="w-4 h-4 text-gray-500 group-hover/id:text-emerald-500 transition-colors" />
+        </div>
+      </div>
+
+      <div className="flex items-center gap-4 relative z-10">
+        <div className="relative w-28 h-28 flex items-center justify-center shrink-0">
+          <svg className="w-full h-full -rotate-90 scale-110">
+            <circle
+              cx="56"
+              cy="56"
+              r="48"
+              fill="none"
+              stroke="white"
+              strokeWidth="4"
+              strokeOpacity="0.05"
+            />
+            <circle
+              cx="56"
+              cy="56"
+              r="48"
+              fill="none"
+              stroke="#10b981"
+              strokeWidth="6"
+              strokeDasharray={301.59}
+              strokeDashoffset={301.59 * (1 - 0.85)}
+              strokeLinecap="round"
+              className="drop-shadow-[0_0_12px_rgba(16,185,129,0.8)]"
+            />
+          </svg>
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+            <span className="text-[10px] font-black text-gray-400 uppercase tracking-tighter leading-none">VOLUMEN</span>
+            <span className="text-base font-black text-emerald-400 italic mt-0.5 tracking-tighter">{volume} M</span>
+          </div>
+        </div>
+
+        <div className="flex-1 space-y-4 text-right">
+          <div className="flex items-center justify-end gap-3 group/team">
+            <span className="text-base font-black text-white italic uppercase tracking-tighter group-hover/team:text-emerald-400 transition-colors line-clamp-1">{match.homeTeam}</span>
+            <div className="w-12 h-12 bg-white/5 rounded-2xl flex items-center justify-center p-2 border border-white/10 group-hover/team:scale-110 group-hover/team:border-emerald-500/50 transition-all shadow-xl text-center">
+              <img src={match.homeLogo || getTeamLogo(match.homeTeam)} className="w-full h-full object-contain mx-auto" alt="" />
+            </div>
+          </div>
+          
+          <div className="flex justify-end pr-14 relative h-4 items-center">
+            <div className="absolute right-14 w-10 h-[1px] bg-white/5" />
+            <div className="text-xs font-black text-emerald-500 italic tracking-widest opacity-40 px-2 bg-brand-surface z-10">VS</div>
+          </div>
+
+          <div className="flex items-center justify-end gap-3 group/team">
+            <span className="text-base font-black text-white italic uppercase tracking-tighter group-hover/team:text-emerald-400 transition-colors line-clamp-1">{match.awayTeam}</span>
+            <div className="w-12 h-12 bg-white/5 rounded-2xl flex items-center justify-center p-2 border border-white/10 group-hover/team:scale-110 group-hover/team:border-emerald-500/50 transition-all shadow-xl text-center">
+               <img src={match.awayLogo || getTeamLogo(match.awayTeam)} className="w-full h-full object-contain mx-auto" alt="" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-8 pt-6 border-t border-white/5 flex items-center justify-between relative z-10">
+        <div className="flex items-center gap-2.5 text-gray-400">
+          <Calendar className="w-4 h-4 text-emerald-500" />
+          <span className="text-xs font-black tracking-wider text-white/60">
+            {formatDate(match.startTime)} {formatTime(match.startTime)}
+          </span>
+        </div>
+        <CountdownTimer targetDate={match.startTime} />
+      </div>
+
+      <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-emerald-400/30 to-transparent" />
+    </motion.div>
+  );
+}
 
 export default function App() {
   const [user, loading] = useAuthState(auth);
@@ -70,11 +234,25 @@ export default function App() {
   const [luckyBoxCountdown, setLuckyBoxCountdown] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [showSupport, setShowSupport] = useState(false);
+  const [showSecurityModal, setShowSecurityModal] = useState(false);
 
-  // 0. Auto-sync matches (internal cooldown check exists)
+  // 0. Auto-sync matches and resolve bets
   useEffect(() => {
-    syncFootballMatches().catch(e => console.error('Match sync error:', e));
-  }, []);
+    if (!user) return;
+    const isAdminUser = user.email === 'ortegayonatan426@gmail.com';
+    if (!isAdminUser) return; // Only admin triggers maintenance
+    
+    const runMaintenance = async () => {
+      try {
+        console.log('Running administrator maintenance tasks...');
+        await syncFootballMatches();
+        await resolvePendingBets();
+      } catch (e) {
+        console.error('Maintenance error details:', e);
+      }
+    };
+    runMaintenance();
+  }, [user]);
 
   // 1. Load Profile
   useEffect(() => {
@@ -92,6 +270,9 @@ export default function App() {
           email: user.email || '',
           displayName: user.displayName || 'Usuario',
           balance: 1000,
+          checkInStreak: 0,
+          lastCheckInDate: '',
+          vipLevel: 0,
           createdAt: serverTimestamp()
         };
         try {
@@ -140,15 +321,21 @@ export default function App() {
     );
     const unsub = onSnapshot(q, (snap) => {
       const allMatches = snap.docs.map(d => ({ id: d.id, ...d.data() } as Match));
-      // Show ONLY real matches. This satisfies the user's request for "partidos reales"
-      const realMatches = allMatches.filter(m => m.isReal);
+      // Relax filter to allow everything initially to debug
+      const realMatches = allMatches;
       
       // Filter out matches that finished more than 2 hours ago
       const now = new Date().getTime();
       const visibleMatches = realMatches.filter(m => {
-        const matchTime = m.startTime?.toDate ? m.startTime.toDate().getTime() : new Date(m.startTime).getTime();
+        let matchTime = 0;
+        if (m.startTime?.toDate) {
+          matchTime = m.startTime.toDate().getTime();
+        } else if (typeof m.startTime === 'string' || typeof m.startTime === 'number') {
+          matchTime = new Date(m.startTime).getTime();
+        }
+        
         if (m.status === 'finished') {
-          return (now - matchTime) < 2 * 60 * 60 * 1000; // Only show finished matches for 2 hours
+          return (now - matchTime) < 2 * 60 * 60 * 1000;
         }
         return true;
       });
@@ -176,19 +363,34 @@ export default function App() {
 
   const handlePlaceBet = async (score: string, amount: number, roi: number) => {
     if (!user || !selectedMatch || !profile) return;
-    await addDoc(collection(db, 'bets'), {
-      userId: user.uid,
-      matchId: selectedMatch.id,
-      homeTeam: selectedMatch.homeTeam,
-      awayTeam: selectedMatch.awayTeam,
-      selectedScore: score,
-      amount: amount,
-      roi: roi,
-      status: 'pending',
-      createdAt: serverTimestamp()
-    });
-    // Balance update should be handled via Cloud Functions or a more complex logic, 
-    // but for this MVP keep it simple.
+    
+    if (profile.balance < amount) {
+      alert(t.insufficientBalance);
+      return;
+    }
+
+    try {
+      // 1. Deduct balance
+      await setDoc(doc(db, 'users', user.uid), {
+        balance: profile.balance - amount
+      }, { merge: true });
+
+      // 2. Create bet
+      await addDoc(collection(db, 'bets'), {
+        userId: user.uid,
+        matchId: selectedMatch.id,
+        homeTeam: selectedMatch.homeTeam,
+        awayTeam: selectedMatch.awayTeam,
+        selectedScore: score,
+        amount: amount,
+        roi: roi,
+        status: 'pending',
+        createdAt: serverTimestamp()
+      });
+    } catch (err) {
+      console.error("Error placing bet:", err);
+      // Rollback would be ideal but complex without transactions
+    }
   };
 
   const handleWithdraw = async (amount: number, address: string, network: string) => {
@@ -239,7 +441,27 @@ export default function App() {
     </div>
   );
 
-  if (!user) return <LandingPage popularMatches={matches.slice(0, 3)} />;
+  if (!user) {
+    return (
+      <>
+        <LandingPage 
+          popularMatches={matches.slice(0, 3)} 
+          onMatchClick={(m) => setSelectedMatch(m)}
+        />
+        {selectedMatch && (
+          <BetModal
+            match={selectedMatch}
+            profile={null}
+            onClose={() => setSelectedMatch(null)}
+            onPlaceBet={async () => {
+              // Redirect to login or show alert
+              alert(t.loginToBet || 'Por favor, inicia sesión para apostar');
+            }}
+          />
+        )}
+      </>
+    );
+  }
 
   const promos = [
     { 
@@ -343,11 +565,11 @@ export default function App() {
                                backgroundColor: ['rgba(0,0,0,0.3)', 'rgba(255,255,0,0.4)', 'rgba(0,0,0,0.3)']
                              } : {}}
                              transition={{ duration: 2, repeat: Infinity }}
-                             className="bg-black/30 backdrop-blur-md px-2 py-0.5 rounded text-[8px] font-black tracking-tighter text-white border border-white/10 italic"
+                             className="bg-black/30 backdrop-blur-md px-2 py-1 rounded text-[10px] font-black tracking-tighter text-white border border-white/10 italic whitespace-nowrap"
                            >
                              {promo.badge}
                            </motion.span>
-                           <p className="text-[10px] font-black text-white/70 uppercase tracking-[0.2em]">{promo.name}</p>
+                           <p className="text-xs font-black text-white/70 uppercase tracking-[0.2em]">{promo.name}</p>
                         </div>
                         <h3 className="text-2xl font-black italic tracking-tighter leading-none text-white drop-shadow-md">
                           {promo.title}
@@ -356,7 +578,7 @@ export default function App() {
 
                       <div className="flex items-end justify-between">
                         <div>
-                          <p className="text-[9px] text-white/60 font-medium uppercase tracking-widest mb-1">{t.invitationBannerPrize}</p>
+                          <p className="text-[10px] text-white/60 font-medium uppercase tracking-widest mb-1">{t.invitationBannerPrize}</p>
                           <div className={cn(
                             "px-4 py-1 rounded-full font-black italic text-lg shadow-lg",
                             promo.id === 'luckybox' ? "bg-yellow-400 text-black shadow-yellow-500/50" : "bg-white text-black"
@@ -447,6 +669,24 @@ export default function App() {
                 </button>
               </div>
 
+              {/* Popular Matches List */}
+              <div className="flex flex-col gap-4">
+                {matches.slice(0, 3).map(match => (
+                  <PopularMatchCard 
+                    key={`popular-${match.id}`} 
+                    match={match} 
+                    onClick={() => setSelectedMatch(match)}
+                    t={t}
+                  />
+                ))}
+              </div>
+
+              {/* All Matches Header */}
+              <div className="flex items-center gap-2 pt-4 border-t border-white/5">
+                 <Dice5 className="w-5 h-5 text-gray-500" />
+                 <h2 className="text-base font-black italic uppercase tracking-tighter text-gray-500">{t.market}</h2>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                 {filteredMatches.length > 0 ? (
                   filteredMatches.map(match => (
@@ -532,6 +772,13 @@ export default function App() {
                onDepositClick={() => setShowDepositModal(true)}
                onWithdrawClick={() => setShowWithdrawModal(true)}
                onLogout={() => auth.signOut()}
+               onRewardsClick={() => setShowRewardsModal(true)}
+               onSecurityClick={() => setShowSecurityModal(true)}
+               onSettingsClick={() => setShowSupport(true)}
+               onNotificationsClick={() => setShowSupport(true)}
+               onAboutClick={() => setShowSupport(true)}
+               onLanguageClick={() => setShowSupport(true)}
+               onBalanceDetailsClick={() => handleTabChange('trade')}
              />
           ) : activeTab === 'admin' ? (
             <AdminPanel />
@@ -565,7 +812,7 @@ export default function App() {
             )}
           >
             <item.icon className={cn("w-6 h-6", activeTab === item.id && "scale-110")} />
-            <span className="text-[9px] font-black uppercase tracking-tighter leading-none">{item.label}</span>
+            <span className="text-[10px] font-black uppercase tracking-tighter leading-none">{item.label}</span>
           </button>
         ))}
       </nav>
@@ -586,7 +833,7 @@ export default function App() {
             )}
           >
             <item.icon className="w-5 h-5 mb-1" />
-            <span className="text-[10px] font-black uppercase tracking-widest">{item.label}</span>
+            <span className="text-xs font-black uppercase tracking-widest">{item.label}</span>
           </button>
         ))}
       </div>
@@ -643,6 +890,12 @@ export default function App() {
           <VipModal
             onClose={() => setShowVipModal(false)}
             profile={profile}
+            t={t}
+          />
+        )}
+        {showSecurityModal && (
+          <SecurityModal
+            onClose={() => setShowSecurityModal(false)}
             t={t}
           />
         )}

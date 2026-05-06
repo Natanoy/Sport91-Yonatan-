@@ -68,9 +68,9 @@ export default function MatchCard({ match, onClick }: MatchCardProps) {
           </div>
           <span className="font-bold text-lg">{match.league}</span>
         </div>
-        <div className="flex items-center gap-2 bg-brand-bg px-3 py-1.5 rounded-full border border-brand-line">
-          <span className="text-[10px] font-bold text-brand-primary uppercase tracking-tighter">ID: {match.id.includes('api_') ? match.id.split('_')[1] : match.id.slice(0, 7)}</span>
-          <Copy className="w-3 h-3 text-gray-500 hover:text-white transition-colors" />
+        <div className="flex items-center gap-2 bg-brand-bg px-4 py-2 rounded-full border border-brand-line">
+          <span className="text-xs font-bold text-brand-primary uppercase tracking-tighter">ID: {match.id.includes('api_') ? match.id.split('_')[1] : match.id.slice(0, 7)}</span>
+          <Copy className="w-4 h-4 text-gray-500 hover:text-white transition-colors" />
         </div>
       </div>
 
@@ -93,31 +93,31 @@ export default function MatchCard({ match, onClick }: MatchCardProps) {
             />
           </svg>
           <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <span className="text-[8px] font-mono text-gray-500 uppercase">{t.volume}</span>
-            <span className="text-sm font-black text-brand-primary leading-tight">{(Math.random() * 90 + 10).toFixed(2)}M</span>
+            <span className="text-[10px] font-mono text-gray-500 uppercase">{t.volume}</span>
+            <span className="text-base font-black text-brand-primary leading-tight">{(Math.random() * 90 + 10).toFixed(2)}M</span>
           </div>
         </div>
 
-        <div className="flex-1 space-y-6">
+        <div className="flex-1 space-y-7">
           <div className="flex items-center justify-between">
-            <span className="font-bold text-gray-100 flex-1">{match.homeTeam}</span>
+            <span className="font-bold text-gray-100 flex-1 text-base uppercase tracking-tight">{match.homeTeam}</span>
             <img 
               src={match.homeLogo || getTeamLogo(match.homeTeam)} 
-              className="w-10 h-10 object-contain ml-3" 
+              className="w-12 h-12 object-contain ml-3" 
               alt="" 
             />
           </div>
           
           <div className="flex items-center justify-center -my-2 relative">
              <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-dashed border-white/10" /></div>
-             <span className="relative z-10 bg-brand-surface px-2 text-brand-primary italic font-black text-sm">VS</span>
+             <span className="relative z-10 bg-brand-surface px-2 text-brand-primary italic font-black text-xs">VS</span>
           </div>
 
           <div className="flex items-center justify-between">
-            <span className="font-bold text-gray-100 flex-1">{match.awayTeam}</span>
+            <span className="font-bold text-gray-100 flex-1 text-base uppercase tracking-tight">{match.awayTeam}</span>
             <img 
               src={match.awayLogo || getTeamLogo(match.awayTeam)} 
-              className="w-10 h-10 object-contain ml-3" 
+              className="w-12 h-12 object-contain ml-3" 
               alt="" 
             />
           </div>
@@ -127,19 +127,19 @@ export default function MatchCard({ match, onClick }: MatchCardProps) {
       <div className="mt-8 pt-6 border-t border-brand-line flex items-center justify-between">
         <div className="flex flex-col gap-1">
           <div className="flex items-center gap-2 text-gray-400">
-            <Clock className="w-4 h-4 text-brand-primary font-bold" />
-            <span className="text-xs font-bold font-mono tracking-tighter">{formattedDate}</span>
+            <Clock className="w-5 h-5 text-brand-primary font-bold" />
+            <span className="text-sm font-bold font-mono tracking-tighter">{formattedDate}</span>
           </div>
           {countdown && (
             <div className="flex items-center gap-1.5">
-               <Timer className="w-3 h-3 text-red-500 animate-pulse" />
-               <span className="text-[10px] font-black text-red-500 font-mono italic uppercase">{countdown}</span>
+               <Timer className="w-4 h-4 text-red-500 animate-pulse" />
+               <span className="text-xs font-black text-red-500 font-mono italic uppercase">{countdown}</span>
             </div>
           )}
         </div>
 
-        <div className="flex items-center gap-1 bg-brand-primary/10 px-3 py-1.5 rounded-xl border border-brand-primary/20">
-           <span className="text-[10px] font-black text-brand-primary uppercase italic">Market Open</span>
+        <div className="flex items-center gap-2 bg-brand-primary/10 px-4 py-2 rounded-xl border border-brand-primary/20">
+           <span className="text-xs font-black text-brand-primary uppercase italic">Trade Now</span>
         </div>
       </div>
     </motion.div>

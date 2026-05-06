@@ -59,15 +59,37 @@ export async function syncFootballMatches() {
     for (const apiMatch of finalMatches) {
       const matchId = `api_${apiMatch.fixture.id}`;
       
-      // Generate consistent but "random-looking" odds for anti-score
+      // Generate consistent but "random-looking" odds for anti-score based on user-provided scores
       const seed = apiMatch.fixture.id;
       const antiScoreOdds = {
-        "0-0": (5 + (seed % 70) / 10).toFixed(2) as any * 1,
-        "1-1": (4 + (seed % 60) / 10).toFixed(2) as any * 1,
-        "2-1": (8 + (seed % 120) / 10).toFixed(2) as any * 1,
-        "3-3": (25 + (seed % 300) / 10).toFixed(2) as any * 1,
-        "0-3": (15 + (seed % 150) / 10).toFixed(2) as any * 1,
+        "0-0": (2.5 + (seed % 20) / 100),
+        "0-1": (1.2 + (seed % 20) / 100),
+        "0-2": (0.6 + (seed % 20) / 100),
+        "0-3": (0.9 + (seed % 20) / 100),
+        "0-4": (0.2 + (seed % 20) / 100),
+        "1-0": (0.4 + (seed % 20) / 100),
+        "1-1": (2.0 + (seed % 20) / 100),
+        "1-2": (0.8 + (seed % 20) / 100),
+        "1-3": (0.5 + (seed % 20) / 100),
+        "2-0": (2.0 + (seed % 20) / 100),
+        "2-1": (0.7 + (seed % 20) / 100),
+        "2-2": (0.8 + (seed % 20) / 100),
+        "2-3": (0.2 + (seed % 20) / 100),
+        "3-0": (0.2 + (seed % 20) / 100),
+        "3-1": (0.5 + (seed % 20) / 100),
+        "3-2": (0.6 + (seed % 20) / 100),
+        "3-3": (0.2 + (seed % 20) / 100),
+        "4-0": (0.6 + (seed % 20) / 100),
+        "4-4": (0.4 + (seed % 10) / 100),
+        "otro": 0.2,
       };
+
+      // Clean up values to be numbers with 2 decimals
+      Object.keys(antiScoreOdds).forEach(key => {
+        if (key !== 'otro') {
+          (antiScoreOdds as any)[key] = parseFloat((antiScoreOdds as any)[key].toFixed(2));
+        }
+      });
 
       const matchData: Match = {
         id: matchId,
@@ -80,6 +102,7 @@ export async function syncFootballMatches() {
         league: apiMatch.league.name,
         leagueLogo: apiMatch.league.logo,
         isReal: true,
+        finalScore: apiMatch.goals.home !== null ? `${apiMatch.goals.home}-${apiMatch.goals.away}` : undefined,
         antiScoreOdds
       };
 
