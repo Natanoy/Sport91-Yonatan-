@@ -1,0 +1,67 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && request.auth.token.email == 'ortegayonatan426@gmail.com';
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // User Profile
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId) && 
+        incoming().uid == userId &&
+        incoming().balance is number &&
+        incoming().balance >= 0 &&
+        incoming().email == request.auth.token.email;
+      allow update: if isOwner(userId) && 
+        incoming().diff(existing()).affectedKeys().hasOnly(['balance', 'displayName']) &&
+        incoming().balance is number &&
+        incoming().balance >= 0;
+    }
+
+    // Matches
+    match /matches/{matchId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // Bets
+    match /bets/{betId} {
+      allow read: if isSignedIn() && (existing().userId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && 
+        incoming().userId == request.auth.uid &&
+        incoming().status == 'pending' &&
+        incoming().amount is number &&
+        incoming().amount > 0 &&
+        isValidId(incoming().matchId);
+      allow update: if isAdmin(); // Admin updates bet status
+      allow delete: if false;
+    }
+  }
+}

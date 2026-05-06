@@ -1,0 +1,63 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  
+  --color-brand-primary: #d7ff00;
+  --color-brand-bg: #0a0b0d;
+  --color-brand-surface: #14161a;
+  --color-brand-line: #22252b;
+}
+
+@layer base {
+  body {
+    @apply bg-brand-bg text-gray-100 font-sans antialiased;
+  }
+}
+
+@layer components {
+  .betting-card {
+    @apply bg-brand-surface border border-brand-line rounded-xl overflow-hidden transition-all duration-200 hover:border-brand-primary/30;
+  }
+  
+  .input-field {
+    @apply w-full bg-transparent border border-brand-line rounded-lg px-12 py-4 text-sm focus:outline-none focus:border-brand-primary transition-all placeholder:text-gray-600;
+  }
+
+  .slant-button {
+    @apply relative overflow-hidden bg-brand-surface border-b-4 border-brand-primary/30 hover:border-brand-primary transition-all py-4 px-8 font-black italic uppercase tracking-widest text-center cursor-pointer;
+  }
+
+  .slant-button::before {
+    content: '';
+    @apply absolute inset-0 bg-brand-primary opacity-0 hover:opacity-5 transition-opacity;
+  }
+  
+  .data-grid-header {
+    @apply font-mono text-[10px] uppercase tracking-wider text-gray-500 py-2 border-b border-brand-line;
+  }
+  
+  .odd-badge {
+    @apply font-mono font-bold text-brand-primary bg-brand-primary/10 px-2 py-1 rounded text-sm;
+  }
+
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+@utility safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+@keyframes gradient-x {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.animate-gradient-x {
+  animation: gradient-x 3s ease infinite;
+}

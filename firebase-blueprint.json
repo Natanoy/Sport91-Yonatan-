@@ -1,0 +1,109 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile, balance and roles",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "displayName": { "type": "string" },
+        "email": { "type": "string" },
+        "balance": { "type": "number" },
+        "role": { "type": "string", "enum": ["admin", "user"] },
+        "checkInStreak": { "type": "number" },
+        "lastCheckInDate": { "type": "string", "description": "ISO date string for NY timezone" },
+        "totalDeposits": { "type": "number" },
+        "totalBets": { "type": "number" },
+        "vipLevel": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "balance", "createdAt"]
+    },
+    "Match": {
+      "title": "Match",
+      "description": "Football match details and anti-score ROI odds",
+      "type": "object",
+      "properties": {
+        "homeTeam": { "type": "string" },
+        "awayTeam": { "type": "string" },
+        "startTime": { "type": "string", "format": "date-time" },
+        "status": { "type": "string", "enum": ["upcoming", "live", "finished"] },
+        "league": { "type": "string" },
+        "finalScore": { "type": "string" },
+        "antiScoreOdds": {
+          "type": "object",
+          "description": "Mapping of scores to ROI percentage"
+        }
+      },
+      "required": ["homeTeam", "awayTeam", "startTime", "status", "antiScoreOdds"]
+    },
+    "Bet": {
+      "title": "Bet",
+      "description": "User's anti-score bet",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "matchId": { "type": "string" },
+        "homeTeam": { "type": "string" },
+        "awayTeam": { "type": "string" },
+        "selectedScore": { "type": "string" },
+        "amount": { "type": "number" },
+        "roi": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "won", "lost"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "matchId", "selectedScore", "amount", "roi", "status", "createdAt"]
+    },
+    "SupportTicket": {
+      "title": "Support Ticket",
+      "description": "User messages for administration",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "message": { "type": "string" },
+        "status": { "type": "string", "enum": ["open", "closed"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["email", "message", "status", "createdAt"]
+    },
+    "Withdrawal": {
+      "title": "Withdrawal",
+      "description": "User withdrawal request",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "amount": { "type": "number" },
+        "fee": { "type": "number" },
+        "netAmount": { "type": "number" },
+        "address": { "type": "string" },
+        "network": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "completed", "rejected"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "amount", "address", "network", "status", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User data and balance"
+    },
+    "/matches/{matchId}": {
+      "schema": "Match",
+      "description": "Matches available for betting"
+    },
+    "/bets/{betId}": {
+      "schema": "Bet",
+      "description": "Bets placed by users"
+    },
+    "/tickets/{ticketId}": {
+      "schema": "SupportTicket",
+      "description": "Support tickets from users"
+    },
+    "/withdrawals/{withdrawalId}": {
+      "schema": "Withdrawal",
+      "description": "Withdrawal requests"
+    }
+  }
+}
