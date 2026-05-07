@@ -6,10 +6,11 @@ import {
   doc, 
   updateDoc, 
   getDoc,
-  runTransaction
+  runTransaction,
+  Timestamp
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import { Bet, Match } from '../types';
+import { Bet, Match, UserProfile, UserNotification } from '../types';
 
 export async function resolvePendingBets(userId?: string) {
   console.log('Starting bet resolution process...');
@@ -53,11 +54,31 @@ export async function resolvePendingBets(userId?: string) {
           
           if (!userSnap.exists()) return;
           
-          const currentBalance = userSnap.data().balance || 0;
+          const userData = userSnap.data() as UserProfile;
+          const currentBalance = userData.balance || 0;
           const newBalance = currentBalance + payout;
           
-          // Update User Balance
-          transaction.update(userRef, { balance: newBalance });
+          // Create Notification
+          const newNotification: UserNotification = {
+            id: Math.random().toString(36).substring(2, 9),
+            type: isWin ? 'bet_won' : 'bet_lost',
+            title: isWin ? 'Liquidación: ¡Éxito!' : 'Liquidación: Protección 100%',
+            message: isWin 
+              ? `Operación finalizada con éxito en el encuentro ${bet.homeTeam} vs ${bet.awayTeam}. Se ha acreditado un beneficio neto de ${profit.toFixed(2)} USDT.`
+              : `El encuentro ${bet.homeTeam} vs ${bet.awayTeam} finalizó sin beneficios adicionales (ROI 0%). Conforme a nuestro protocolo de seguridad, su capital total de ${bet.amount} USDT ha sido reembolsado íntegramente a su balance principal.`,
+            timestamp: Timestamp.now(),
+            read: false,
+            amount: payout
+          };
+
+          const currentNotifications = userData.notifications || [];
+          const updatedNotifications = [newNotification, ...currentNotifications].slice(0, 50);
+
+          // Update User Balance and Notifications
+          transaction.update(userRef, { 
+            balance: newBalance,
+            notifications: updatedNotifications
+          });
           
           // Update Bet Status
           transaction.update(doc(db, 'bets', bet.id), {
@@ -65,7 +86,7 @@ export async function resolvePendingBets(userId?: string) {
             finalScore: match.finalScore,
             payout: payout,
             profit: profit,
-            resolvedAt: new Date()
+            resolvedAt: Timestamp.now()
           });
         });
 

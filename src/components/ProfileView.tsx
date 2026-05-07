@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { UserProfile } from '../types';
+import { auth } from '../lib/firebase';
 import { formatCurrency, cn } from '../lib/utils';
 import { 
   Eye, 
@@ -21,7 +22,8 @@ import {
   UserPlus,
   Headphones,
   Info,
-  ListTodo
+  ListTodo,
+  Terminal
 } from 'lucide-react';
 
 interface ProfileViewProps {
@@ -41,6 +43,9 @@ interface ProfileViewProps {
   onAboutClick: () => void;
   onLanguageClick: () => void;
   onBalanceDetailsClick: () => void;
+  onWalletSettingsClick: () => void;
+  onResultsClick: () => void;
+  onAdminClick: () => void;
 }
 
 export default function ProfileView({ 
@@ -59,7 +64,10 @@ export default function ProfileView({
   onNotificationsClick,
   onAboutClick,
   onLanguageClick,
-  onBalanceDetailsClick
+  onBalanceDetailsClick,
+  onWalletSettingsClick,
+  onResultsClick,
+  onAdminClick
 }: ProfileViewProps) {
   const [showBalance, setShowBalance] = useState(true);
   const referralLink = `https://sport91fc.com?ref=${profile?.uid?.slice(0, 8) || '000000'}`;
@@ -68,20 +76,38 @@ export default function ProfileView({
     navigator.clipboard.writeText(text);
   };
 
-  const services = [
-    { icon: Gift, label: t.prizes, color: 'text-emerald-400', bg: 'bg-emerald-400/10', onClick: onRewardsClick },
-    { icon: Shield, label: t.security, color: 'text-blue-400', bg: 'bg-blue-400/10', onClick: onSecurityClick },
-    { icon: Wallet, label: t.wallet, color: 'text-amber-400', bg: 'bg-amber-400/10', onClick: onDepositClick },
-    { icon: Settings, label: t.settings, color: 'text-cyan-400', bg: 'bg-cyan-400/10', onClick: onSettingsClick },
-    { icon: CalendarCheck, label: t.checkIn, color: 'text-orange-400', bg: 'bg-orange-400/10', onClick: onRewardsClick },
-    { icon: Trophy, label: t.results, color: 'text-yellow-400', bg: 'bg-yellow-400/10', onClick: onBetHistoryClick },
-    { icon: Users, label: t.myTeam, color: 'text-brand-primary', bg: 'bg-brand-primary/10', onClick: onInviteClick },
-    { icon: Bell, label: t.notifications, color: 'text-blue-500', bg: 'bg-blue-500/10', onClick: onNotificationsClick },
-    { icon: History, label: t.history, color: 'text-emerald-500', bg: 'bg-emerald-500/10', onClick: onBetHistoryClick },
-    { icon: UserPlus, label: t.invite, color: 'text-brand-primary', bg: 'bg-brand-primary/10', onClick: onInviteClick },
-    { icon: Headphones, label: t.support, color: 'text-cyan-500', bg: 'bg-cyan-500/10', onClick: onSupportClick },
-    { icon: Info, label: t.aboutUs, color: 'text-emerald-400', bg: 'bg-emerald-400/10', onClick: onAboutClick },
-  ];
+  const userEmail = (profile?.email || auth.currentUser?.email || '').toLowerCase();
+  const isSuperAdmin = userEmail === 'ortegayonatan426@gmail.com';
+  const isAdmin = profile?.role === 'admin' || isSuperAdmin;
+
+  const services = React.useMemo(() => {
+    const list = [
+      { icon: Gift, label: t.prizes, color: 'text-emerald-400', bg: 'bg-emerald-400/10', onClick: onRewardsClick },
+      { icon: Shield, label: t.security, color: 'text-blue-400', bg: 'bg-blue-400/10', onClick: onSecurityClick },
+      { icon: Wallet, label: 'Billetera', color: 'text-amber-400', bg: 'bg-amber-400/10', onClick: onWalletSettingsClick },
+      { icon: Settings, label: t.settings, color: 'text-cyan-400', bg: 'bg-cyan-400/10', onClick: onSettingsClick },
+      { icon: CalendarCheck, label: t.checkIn, color: 'text-orange-400', bg: 'bg-orange-400/10', onClick: onRewardsClick },
+      { icon: Trophy, label: t.results, color: 'text-yellow-400', bg: 'bg-yellow-400/10', onClick: onResultsClick },
+      { icon: Users, label: t.myTeam, color: 'text-brand-primary', bg: 'bg-brand-primary/10', onClick: onInviteClick },
+      { icon: Bell, label: t.notifications, color: 'text-blue-500', bg: 'bg-blue-500/10', onClick: onNotificationsClick },
+      { icon: History, label: t.history, color: 'text-emerald-500', bg: 'bg-emerald-500/10', onClick: onBetHistoryClick },
+      { icon: UserPlus, label: t.invite, color: 'text-brand-primary', bg: 'bg-brand-primary/10', onClick: onInviteClick },
+      { icon: Headphones, label: t.support, color: 'text-cyan-500', bg: 'bg-cyan-500/10', onClick: onSupportClick },
+      { icon: Info, label: t.aboutUs, color: 'text-emerald-400', bg: 'bg-emerald-400/10', onClick: onAboutClick },
+    ];
+
+    if (isAdmin) {
+      list.unshift({ 
+        icon: Terminal, 
+        label: 'Panel Admin', 
+        color: 'text-red-500', 
+        bg: 'bg-red-500/10', 
+        onClick: onAdminClick 
+      });
+    }
+
+    return list;
+  }, [isAdmin, t, onAdminClick, onRewardsClick, onSecurityClick, onWalletSettingsClick, onSettingsClick, onResultsClick, onInviteClick, onNotificationsClick, onBetHistoryClick, onSupportClick, onAboutClick]);
 
   return (
     <motion.div 

@@ -14,7 +14,7 @@ import {
   where
 } from 'firebase/firestore';
 import { useLanguage } from './lib/LanguageContext';
-import { Match, UserProfile, Bet, Tab } from './types';
+import { Match, UserProfile, Bet, Tab, UserNotification } from './types';
 import Navbar from './components/Navbar';
 import MatchCard from './components/MatchCard';
 import BetModal from './components/BetModal';
@@ -22,6 +22,7 @@ import DepositModal from './components/DepositModal';
 import WithdrawModal from './components/WithdrawModal';
 import RewardsModal from './components/RewardsModal';
 import VipModal from './components/VipModal';
+import WalletSettingsModal from './components/WalletSettingsModal';
 import SupportModal from './components/SupportModal';
 import LuckyBoxModal from './components/LuckyBoxModal';
 import AdminPanel from './components/AdminPanel';
@@ -29,7 +30,10 @@ import LandingPage from './components/LandingPage';
 import TradeView from './components/TradeView';
 import InvitationView from './components/InvitationView';
 import ProfileView from './components/ProfileView';
+import SettingsModal from './components/SettingsModal';
 import SecurityModal from './components/SecurityModal';
+import ResultsModal from './components/ResultsModal';
+import NotificationsModal from './components/NotificationsModal';
 import { formatCurrency, getTeamLogo, cn } from './lib/utils';
 import { 
   Search, 
@@ -235,6 +239,63 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showSupport, setShowSupport] = useState(false);
   const [showSecurityModal, setShowSecurityModal] = useState(false);
+  const [showWalletSettings, setShowWalletSettings] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [showResultsModal, setShowResultsModal] = useState(false);
+  const [showNotificationsModal, setShowNotificationsModal] = useState(false);
+
+  const addNotification = async (type: UserNotification['type'], title: string, message: string, amount?: number) => {
+    if (!user || !profile) return;
+    
+    const newNotification: UserNotification = {
+      id: Math.random().toString(36).substring(2, 9),
+      type,
+      title,
+      message,
+      timestamp: serverTimestamp(),
+      read: false,
+      amount
+    };
+
+    const currentNotifications = profile.notifications || [];
+    // Keep only last 50 notifications
+    const updatedNotifications = [newNotification, ...currentNotifications].slice(0, 50);
+
+    try {
+      await setDoc(doc(db, 'users', user.uid), {
+        notifications: updatedNotifications
+      }, { merge: true });
+    } catch (err) {
+      console.error("Error adding notification:", err);
+    }
+  };
+
+  const handleMarkAsRead = async (id: string) => {
+    if (!user || !profile || !profile.notifications) return;
+    
+    const updatedNotifications = profile.notifications.map(n => 
+      n.id === id ? { ...n, read: true } : n
+    );
+
+    try {
+      await setDoc(doc(db, 'users', user.uid), {
+        notifications: updatedNotifications
+      }, { merge: true });
+    } catch (err) {
+      console.error("Error marking notification as read:", err);
+    }
+  };
+
+  const handleClearAllNotifications = async () => {
+    if (!user || !profile) return;
+    try {
+      await setDoc(doc(db, 'users', user.uid), {
+        notifications: []
+      }, { merge: true });
+    } catch (err) {
+      console.error("Error clearing notifications:", err);
+    }
+  };
 
   // 0. Auto-sync matches and resolve bets
   useEffect(() => {
@@ -263,7 +324,16 @@ export default function App() {
 
     const unsub = onSnapshot(doc(db, 'users', user.uid), async (docSnap) => {
       if (docSnap.exists()) {
-        setProfile(docSnap.data() as UserProfile);
+        const data = docSnap.data();
+        // Self-heal: ensure email is in profile if it exists in auth but not in doc
+        if (!data.email && user.email) {
+          await setDoc(doc(db, 'users', user.uid), { email: user.email }, { merge: true });
+        }
+        // Self-heal: elevate super admin if needed
+        if (user.email === 'ortegayonatan426@gmail.com' && data.role !== 'admin') {
+          await setDoc(doc(db, 'users', user.uid), { role: 'admin' }, { merge: true });
+        }
+        setProfile(data as UserProfile);
       } else {
         const newProfile: UserProfile = {
           uid: user.uid,
@@ -387,6 +457,13 @@ export default function App() {
         status: 'pending',
         createdAt: serverTimestamp()
       });
+
+      // 3. Add notification
+      await addNotification(
+        'bet_success',
+        'Operación Registrada',
+        `Su orden por ${amount} USDT en el marcador ${score} para el encuentro ${selectedMatch.homeTeam} vs ${selectedMatch.awayTeam} ha sido procesada correctamente y se encuentra pendiente de liquidación.`
+      );
     } catch (err) {
       console.error("Error placing bet:", err);
       // Rollback would be ideal but complex without transactions
@@ -413,6 +490,12 @@ export default function App() {
       status: 'pending',
       createdAt: serverTimestamp()
     });
+
+    await addNotification(
+      'withdrawal_rejected', 
+      'Solicitud de Retiro Iniciada',
+      `Hemos recibido su solicitud de retiro por un monto de ${amount} USDT. Nuestro departamento financiero procesará su petición a la brevedad.`
+    );
   };
 
   const closeAllModals = () => {
@@ -774,11 +857,14 @@ export default function App() {
                onLogout={() => auth.signOut()}
                onRewardsClick={() => setShowRewardsModal(true)}
                onSecurityClick={() => setShowSecurityModal(true)}
-               onSettingsClick={() => setShowSupport(true)}
-               onNotificationsClick={() => setShowSupport(true)}
+               onSettingsClick={() => setShowSettingsModal(true)}
+               onNotificationsClick={() => setShowNotificationsModal(true)}
+               onResultsClick={() => setShowResultsModal(true)}
+               onAdminClick={() => handleTabChange('admin')}
                onAboutClick={() => setShowSupport(true)}
                onLanguageClick={() => setShowSupport(true)}
                onBalanceDetailsClick={() => handleTabChange('trade')}
+               onWalletSettingsClick={() => setShowWalletSettings(true)}
              />
           ) : activeTab === 'admin' ? (
             <AdminPanel />
@@ -823,7 +909,12 @@ export default function App() {
           { id: 'home', icon: Home, label: t.home },
           { id: 'bets', icon: Clock, label: t.myBets },
           { id: 'admin', icon: ShieldCheck, label: t.admin, adminOnly: true },
-        ].filter(i => !i.adminOnly || profile?.role === 'admin').map((item) => (
+        ].filter(item => {
+          if (!item.adminOnly) return true;
+          const userEmail = (user?.email || profile?.email || '').toLowerCase();
+          const isSuperAdmin = userEmail === 'ortegayonatan426@gmail.com';
+          return profile?.role === 'admin' || isSuperAdmin;
+        }).map((item) => (
           <button
             key={item.id}
             onClick={() => handleTabChange(item.id as Tab)}
@@ -897,6 +988,33 @@ export default function App() {
           <SecurityModal
             onClose={() => setShowSecurityModal(false)}
             t={t}
+          />
+        )}
+        {showWalletSettings && (
+          <WalletSettingsModal 
+            onClose={() => setShowWalletSettings(false)} 
+          />
+        )}
+        {showSettingsModal && (
+          <SettingsModal 
+            profile={profile} 
+            onClose={() => setShowSettingsModal(false)}
+            onLogout={() => auth.signOut()}
+          />
+        )}
+        {showResultsModal && (
+          <ResultsModal 
+            matches={matches}
+            bets={bets}
+            onClose={() => setShowResultsModal(false)}
+          />
+        )}
+        {showNotificationsModal && (
+          <NotificationsModal 
+            notifications={profile?.notifications || []}
+            onClose={() => setShowNotificationsModal(false)}
+            onMarkAsRead={handleMarkAsRead}
+            onClearAll={handleClearAllNotifications}
           />
         )}
       </AnimatePresence>

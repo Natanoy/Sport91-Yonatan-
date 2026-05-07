@@ -1,6 +1,16 @@
 export type Language = 'en' | 'es' | 'pt' | 'ru';
 export type Tab = 'home' | 'market' | 'trade' | 'invite' | 'me' | 'admin' | 'bets';
 
+export interface UserNotification {
+  id: string;
+  type: 'deposit' | 'withdrawal_approved' | 'withdrawal_rejected' | 'bet_success' | 'bet_won' | 'bet_lost';
+  title: string;
+  message: string;
+  timestamp: any;
+  read: boolean;
+  amount?: number;
+}
+
 export interface UserProfile {
   uid: string;
   email: string;
@@ -25,6 +35,7 @@ export interface UserProfile {
   weeklyProfit?: number;
   lastLuckyBoxClaim?: string | null;
   lotteryTickets?: number;
+  notifications?: UserNotification[];
   createdAt: any;
 }
 
@@ -49,7 +60,7 @@ export interface Match {
   antiScoreOdds: AntiScoreOdds;
 }
 
-export type BetStatus = 'pending' | 'won' | 'lost';
+export type BetStatus = 'pending' | 'won' | 'lost' | 'canceled';
 
 export interface Bet {
   id: string;

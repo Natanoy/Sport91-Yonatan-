@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { formatCurrency, calculatePotentialProfit, cn, getTeamLogo } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import { useLanguage } from '../lib/LanguageContext';
+import HistoryModal from './HistoryModal';
 
 interface BetModalProps {
   match: Match;
@@ -64,6 +65,7 @@ export default function BetModal({ match, profile, onClose, onPlaceBet }: BetMod
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [showHistory, setShowHistory] = useState(false);
 
   const numericAmount = parseFloat(amount) || 0;
   const currentROI = selectedScore ? match.antiScoreOdds[selectedScore] : 0;
@@ -129,7 +131,10 @@ export default function BetModal({ match, profile, onClose, onPlaceBet }: BetMod
           <h1 className="text-lg font-black text-white italic tracking-tighter uppercase">
             {step === 'market' ? 'Detalles del partido' : 'Detalles de la apuesta'}
           </h1>
-          <button className="p-2.5 bg-white/5 rounded-xl text-gray-500">
+          <button 
+            onClick={() => setShowHistory(true)}
+            className="p-2.5 bg-white/5 rounded-xl text-gray-500 active:scale-95 transition-transform"
+          >
             <FileText className="w-6 h-6" />
           </button>
         </div>
@@ -399,6 +404,15 @@ export default function BetModal({ match, profile, onClose, onPlaceBet }: BetMod
             </div>
           )}
         </div>
+
+        <AnimatePresence>
+          {showHistory && (
+            <HistoryModal 
+              profile={profile} 
+              onClose={() => setShowHistory(false)} 
+            />
+          )}
+        </AnimatePresence>
       </motion.div>
     </div>
   );
