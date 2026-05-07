@@ -5,12 +5,12 @@ import { cn } from '../lib/utils';
 
 interface InviteModalProps {
   onClose: () => void;
-  userId: string;
+  referralCode: string;
   t: any;
 }
 
-export default function InviteModal({ onClose, userId, t }: InviteModalProps) {
-  const referralLink = `${window.location.origin}?ref=${userId}`;
+export default function InviteModal({ onClose, referralCode, t }: InviteModalProps) {
+  const referralLink = `${window.location.origin}?ref=${referralCode}`;
 
   const copyToClipboard = () => {
     navigator.clipboard.writeText(referralLink);
@@ -28,11 +28,20 @@ export default function InviteModal({ onClose, userId, t }: InviteModalProps) {
       <div className="flex items-center justify-between px-6 py-8 border-b border-white/5">
         <button 
           onClick={onClose}
-          className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center group active:scale-90 transition-all"
+          className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center group active:scale-90 transition-all font-black"
         >
-          <ChevronLeft className="w-6 h-6 text-emerald-500" />
+          <ChevronLeft className="w-6 h-6 text-brand-primary" />
         </button>
-        <h2 className="text-xl font-black uppercase tracking-widest text-white">{t.invite}</h2>
+        <div className="flex items-center gap-2">
+           <div className="w-8 h-8 overflow-hidden flex items-center justify-center">
+              <img 
+                src="https://storage.googleapis.com/test-media-store/6b8d234d-ed12-40de-99f1-610196726884/p-a3967484-904d-4bc5-9c92-3c35b62e49c7.png" 
+                className="w-full h-full object-contain scale-[2.2] translate-y-[-5%] translate-x-[-15%]" 
+                alt="" 
+              />
+           </div>
+           <h2 className="text-xl font-black uppercase tracking-widest text-white italic">Sport91 FC</h2>
+        </div>
         <div className="w-10" />
       </div>
 
@@ -42,8 +51,8 @@ export default function InviteModal({ onClose, userId, t }: InviteModalProps) {
             <div className="aspect-square bg-gray-100 rounded-2xl flex items-center justify-center overflow-hidden border-4 border-black/5">
                <QrCode className="w-[80%] h-[80%] text-black opacity-80" />
             </div>
-            <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 bg-brand-primary px-6 py-2 rounded-full shadow-lg">
-               <span className="text-[10px] font-black italic uppercase text-black">CÓDIGO: {userId.slice(0, 8).toUpperCase()}</span>
+            <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 bg-brand-primary px-6 py-2 rounded-full shadow-lg text-center whitespace-nowrap">
+               <span className="text-[10px] font-black italic uppercase text-black">CÓDIGO: {referralCode}</span>
             </div>
          </div>
 

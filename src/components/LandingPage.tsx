@@ -24,7 +24,13 @@ export default function LandingPage({ popularMatches, onMatchClick }: LandingPag
       {/* Header */}
       <header className="h-20 px-6 flex items-center justify-between border-b border-brand-line bg-brand-bg/80 backdrop-blur-md sticky top-0 z-50">
         <div className="flex items-center gap-2">
-          <div className="bg-brand-primary p-1 rounded italic font-black text-black text-xs">S91</div>
+          <div className="w-12 h-12 overflow-hidden flex items-center justify-center">
+             <img 
+               src="https://storage.googleapis.com/test-media-store/6b8d234d-ed12-40de-99f1-610196726884/p-a3967484-904d-4bc5-9c92-3c35b62e49c7.png" 
+               className="w-full h-full object-contain scale-[2.2] translate-y-[-5%] translate-x-[-15%]" 
+               alt="" 
+             />
+          </div>
           <span className="font-black italic text-xl tracking-tighter uppercase whitespace-nowrap">
             {authMode === 'login' ? 'SPORT91 FC' : t.createAccount.split(' ')[0]}
           </span>
@@ -47,7 +53,17 @@ export default function LandingPage({ popularMatches, onMatchClick }: LandingPag
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 w-full max-w-lg mx-auto py-8 px-6 flex flex-col">
+      <main className="flex-1 w-full max-w-lg mx-auto py-8 px-6 flex flex-col relative">
+        {/* Background Image Decoration */}
+        <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
+           <img 
+             src="https://storage.googleapis.com/test-media-store/6b8d234d-ed12-40de-99f1-610196726884/p-a3967484-904d-4bc5-9c92-3c35b62e49c7.png" 
+             className="w-full h-full object-cover opacity-20 filter saturate-[0.5] blur-[2px]" 
+             alt="" 
+           />
+           <div className="absolute inset-0 bg-gradient-to-b from-brand-bg via-brand-bg/80 to-brand-bg" />
+        </div>
+        
         {/* Popular Events Section */}
         <div className="mb-12">
           <div className="flex items-center gap-2 mb-6">

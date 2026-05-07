@@ -18,8 +18,12 @@ export default function Navbar({ onShowSupport }: NavbarProps) {
   return (
     <nav className="h-20 border-b border-brand-line bg-brand-bg sticky top-0 z-50 flex items-center justify-between px-6">
       <div className="flex items-center gap-3">
-        <div className="w-12 h-12 bg-brand-primary rounded-[1rem] flex items-center justify-center p-1.5 shadow-lg shadow-brand-primary/20 overflow-hidden">
-           <img src="https://img.icons8.com/isometric/100/football.png" className="w-full h-full object-contain brightness-0 invert shadow-2xl" alt="Logo" />
+        <div className="w-12 h-12 bg-transparent rounded-[1rem] flex items-center justify-center overflow-hidden">
+           <img 
+             src="https://storage.googleapis.com/test-media-store/6b8d234d-ed12-40de-99f1-610196726884/p-a3967484-904d-4bc5-9c92-3c35b62e49c7.png" 
+             className="w-full h-full object-contain scale-[2.2] translate-y-[-5%] translate-x-[-15%]" 
+             alt="Logo" 
+           />
         </div>
         <span className="font-black text-3xl tracking-tighter italic uppercase text-white drop-shadow-sm">
           SPORT91 FC

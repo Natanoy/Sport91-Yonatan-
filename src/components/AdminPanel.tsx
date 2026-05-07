@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { db } from '../lib/firebase';
+import React, { useState, useEffect, useMemo } from 'react';
+import { db, auth } from '../lib/firebase';
 import { 
   collection, 
   query, 
@@ -11,167 +11,113 @@ import {
   Timestamp,
   getDoc,
   where,
-  limit
+  limit,
+  addDoc
 } from 'firebase/firestore';
-import { UserProfile, Match } from '../types';
+import { UserProfile, UserRole, SystemSettings, AdminLog } from '../types';
 import { syncFootballMatches } from '../services/matchSyncService';
 import { 
   Users, 
-  Plus, 
-  Minus, 
   Shield, 
-  ShieldAlert, 
-  Search, 
-  CreditCard,
   Activity,
-  RefreshCcw,
   Trophy,
   History,
-  Eye,
-  MessageSquare,
   Zap,
-  Lock,
-  ExternalLink
+  LayoutDashboard,
+  CreditCard,
+  MessageSquare,
+  Settings,
+  ArrowRight,
+  LogOut,
+  RefreshCcw,
+  ShieldAlert,
+  Target,
+  Search,
+  Bell,
+  Maximize2
 } from 'lucide-react';
-import { formatCurrency, cn } from '../lib/utils';
+import { cn, formatCurrency } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import { useLanguage } from '../lib/LanguageContext';
 import { format } from 'date-fns';
 
+// Import sub-components
+import DashboardStats from './admin/DashboardStats';
+import UserManagement from './admin/UserManagement';
+import FinanceHub from './admin/FinanceHub';
+import BettingManager from './admin/BettingManager';
+import SecurityCenter from './admin/SecurityCenter';
+import SystemSettingsManager from './admin/SystemSettings';
+
+type AdminTab = 'dashboard' | 'users' | 'finance' | 'bets' | 'security' | 'settings';
+
 export default function AdminPanel() {
   const { t } = useLanguage();
+  const [activeTab, setActiveTab] = useState<AdminTab>('dashboard');
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [users, setUsers] = useState<UserProfile[]>([]);
-  const [search, setSearch] = useState('');
+  const [withdrawals, setWithdrawals] = useState<any[]>([]);
+  const [deposits, setDeposits] = useState<any[]>([]);
+  const [systemSettings, setSystemSettings] = useState<SystemSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
-  const [lastSyncInfo, setLastSyncInfo] = useState<{ date: Date; count: number } | null>(null);
-  const [withdrawals, setWithdrawals] = useState<any[]>([]);
-  const [tickets, setTickets] = useState<any[]>([]);
-  const [activeTabPanel, setActiveTabPanel] = useState<'users' | 'withdrawals' | 'tickets'>('users');
-  const [selectedUserForMonitor, setSelectedUserForMonitor] = useState<UserProfile | null>(null);
-  const [userBetsForMonitor, setUserBetsForMonitor] = useState<any[]>([]);
 
   useEffect(() => {
-    if (selectedUserForMonitor) {
-      const q = query(
-        collection(db, 'bets'), 
-        where('userId', '==', selectedUserForMonitor.uid),
-        orderBy('createdAt', 'desc'),
-        limit(5)
-      );
-      const unsub = onSnapshot(q, (snap) => {
-        setUserBetsForMonitor(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-      });
-      return () => unsub();
-    }
-  }, [selectedUserForMonitor]);
-
-  useEffect(() => {
-    const qUsers = query(collection(db, 'users'), orderBy('createdAt', 'desc'));
-    const unsubUsers = onSnapshot(qUsers, (snap) => {
-      setUsers(snap.docs.map(d => d.data() as UserProfile));
+    // Users Listener
+    const unsubUsers = onSnapshot(query(collection(db, 'users'), orderBy('createdAt', 'desc')), (snap) => {
+      setUsers(snap.docs.map(d => ({ ...d.data(), uid: d.id } as UserProfile)));
       setLoading(false);
     });
 
-    const qWithdrawals = query(collection(db, 'withdrawals'), orderBy('createdAt', 'desc'));
-    const unsubWithdrawals = onSnapshot(qWithdrawals, (snap) => {
+    // Withdrawals Listener
+    const unsubWithdr = onSnapshot(query(collection(db, 'withdrawals'), orderBy('createdAt', 'desc')), (snap) => {
       setWithdrawals(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
 
-    const qTickets = query(collection(db, 'tickets'), orderBy('createdAt', 'desc'));
-    const unsubTickets = onSnapshot(qTickets, (snap) => {
-      setTickets(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    // Deposits Listener (pending approvals)
+    const unsubDep = onSnapshot(query(collection(db, 'deposits'), orderBy('createdAt', 'desc')), (snap) => {
+      setDeposits(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
 
-    // Fetch last sync info
-    getDoc(doc(db, 'system', 'match_sync')).then(snap => {
-      if (snap.exists()) {
-        setLastSyncInfo({
-          date: snap.data().lastSync?.toDate() || new Date(),
-          count: snap.data().matchCount || 0
-        });
+    // System Settings Listener
+    const unsubSettings = onSnapshot(doc(db, 'system', 'settings'), (snap) => {
+      if (snap.exists()) setSystemSettings(snap.data() as SystemSettings);
+      else {
+        // Init default settings if not exists
+        const defaults: SystemSettings = {
+          platformName: 'Sport91FC',
+          maintenanceMode: false,
+          aiProfitMultiplier: 1.0,
+          minWithdrawal: 10,
+          maxWithdrawal: 50000,
+          withdrawalFee: 3,
+          depositAddress: 'TXSampleAddress123',
+          network: 'TRC20'
+        };
+        setDoc(doc(db, 'system', 'settings'), defaults);
+        setSystemSettings(defaults);
       }
     });
-
-    handleAutoSync();
 
     return () => {
       unsubUsers();
-      unsubWithdrawals();
-      unsubTickets();
+      unsubWithdr();
+      unsubDep();
+      unsubSettings();
     };
   }, []);
 
-  const handleTicketAction = async (ticketId: string, status: 'resolved' | 'closed') => {
-    try {
-      await updateDoc(doc(db, 'tickets', ticketId), { status, updatedAt: Timestamp.now() });
-      alert('Ticket actualizado');
-    } catch (e) {
-      console.error(e);
-      alert('Error actualizando ticket');
-    }
-  };
+  const stats = useMemo(() => ({
+    totalUsers: users.length,
+    activeUsers: users.filter(u => u.isOnline).length || users.length,
+    totalDeposited: users.reduce((acc, u) => acc + (u.totalDeposits || 0), 0),
+    totalWithdrawn: users.reduce((acc, u) => acc + (u.totalWithdrawals || 0), 0),
+    totalProfit: users.reduce((acc, u) => acc + (u.totalDeposits || 0) - (u.totalWithdrawals || 0), 0),
+    activeInvestments: users.filter(u => (u.unliquidated || 0) > 0).length,
+  }), [users]);
 
-  const handleWithdrawalAction = async (withdrawal: any, status: 'approved' | 'rejected') => {
-    try {
-      const userRef = doc(db, 'users', withdrawal.userId);
-      const userSnap = await getDoc(userRef);
-      if (!userSnap.exists()) return;
-      const userData = userSnap.data() as UserProfile;
-
-      const newNotification = {
-        id: Math.random().toString(36).substring(2, 9),
-        type: status === 'approved' ? 'withdrawal_approved' : 'withdrawal_rejected',
-        title: status === 'approved' ? 'Retiro Liquidado' : 'Solicitud de Retiro Denegada',
-        message: status === 'approved'
-          ? `Su solicitud de retiro por ${withdrawal.amount} USDT ha sido aprobada y los fondos han sido transferidos a la dirección de destino.`
-          : `Lamentamos informarle que su solicitud de retiro por ${withdrawal.amount} USDT no ha podido ser procesada. Los activos han sido reintegrados a su balance de forma inmediata.`,
-        timestamp: Timestamp.now(),
-        read: false,
-        amount: withdrawal.amount
-      };
-
-      const notifications = userData.notifications || [];
-      const updatedNotifications = [newNotification, ...notifications].slice(0, 50);
-
-      // Update withdrawal status
-      await updateDoc(doc(db, 'withdrawals', withdrawal.id), { status });
-
-      // If rejected, refund the user
-      if (status === 'rejected') {
-        await updateDoc(userRef, {
-          balance: userData.balance + withdrawal.amount,
-          notifications: updatedNotifications
-        });
-      } else {
-        await updateDoc(userRef, {
-          notifications: updatedNotifications
-        });
-      }
-
-      alert(`Solicitud ${status === 'approved' ? 'aprobada' : 'rechazada'} con éxito.`);
-    } catch (e) {
-      console.error(e);
-      alert('Error al procesar el retiro');
-    }
-  };
-
-  const handleAutoSync = async () => {
-    try {
-      await syncFootballMatches();
-      const snap = await getDoc(doc(db, 'system', 'match_sync'));
-      if (snap.exists()) {
-        setLastSyncInfo({
-          date: snap.data().lastSync?.toDate() || new Date(),
-          count: snap.data().matchCount || 0
-        });
-      }
-    } catch (e) {
-      console.error('Auto-sync failed:', e);
-    }
-  };
-
-  const adjustBalance = async (uid: string, current: number, amount: number) => {
+  // Actions
+  const handleAdjustBalance = async (uid: string, current: number, amount: number) => {
     try {
       const userRef = doc(db, 'users', uid);
       const userSnap = await getDoc(userRef);
@@ -182,495 +128,350 @@ export default function AdminPanel() {
         type: 'deposit',
         title: amount > 0 ? 'Abono Confirmado' : 'Ajuste de Cartera',
         message: amount > 0 
-          ? `Su transferencia de ${amount} USDT ha sido verificada y acreditada exitosamente a su balance principal.`
-          : `Se ha realizado un ajuste administrativo en su balance por un monto de ${Math.abs(amount)} USDT.`,
+          ? `Su transferencia de ${amount} USDT ha sido verificada y acreditada exitosamente.`
+          : `Se ha realizado un ajuste administrativo de ${Math.abs(amount)} USDT.`,
         timestamp: Timestamp.now(),
         read: false,
         amount: Math.abs(amount)
       };
 
-      const notifications = userData.notifications || [];
-      const updatedNotifications = [newNotification, ...notifications].slice(0, 50);
-
       await updateDoc(userRef, {
         balance: Math.max(0, current + amount),
-        notifications: updatedNotifications
+        notifications: [newNotification, ...(userData.notifications || [])].slice(0, 50)
       });
-    } catch (e) {
-      console.error(e);
-      alert('Error updating balance');
-    }
-  };
-
-  const toggleAdmin = async (uid: string, currentRole: string | undefined) => {
-    try {
-      await updateDoc(doc(db, 'users', uid), {
-        role: currentRole === 'admin' ? 'user' : 'admin'
-      });
-    } catch (e) {
-      alert('Only bootstrap admin can manage roles or permission denied');
-    }
-  };
-
-  const syncMatches = async () => {
-    setIsSyncing(true);
-    try {
-      const result = await syncFootballMatches();
-      if (result.success) {
-        alert(result.count ? `Sincronización exitosa: ${result.count} eventos.` : 'Ya estaba actualizado recientemente.');
-      }
       
-      const snap = await getDoc(doc(db, 'system', 'match_sync'));
-      if (snap.exists()) {
-        setLastSyncInfo({
-          date: snap.data().lastSync?.toDate() || new Date(),
-          count: snap.data().matchCount || 0
-        });
-      }
+      // Log Action
+      await addDoc(collection(db, 'admin_logs'), {
+        adminId: auth.currentUser?.uid,
+        adminEmail: auth.currentUser?.email,
+        action: 'BALANCE_ADJUST',
+        targetUserId: uid,
+        details: `Adjusted by ${amount}. New balance: ${Math.max(0, current + amount)}`,
+        timestamp: Timestamp.now()
+      });
     } catch (e) {
       console.error(e);
-      alert('Error syncing matches. Make sure API KEY is configured.');
-    } finally {
-      setIsSyncing(false);
+      alert('Error en el ajuste');
     }
   };
 
-  const filteredUsers = users.filter(u => 
-    u.email.toLowerCase().includes(search.toLowerCase()) || 
-    u.displayName.toLowerCase().includes(search.toLowerCase())
-  );
+  const handleToggleRole = async (uid: string, currentRole: UserRole | undefined) => {
+    const roles: UserRole[] = ['user', 'manager', 'moderator', 'admin', 'super_admin'];
+    const currentIdx = roles.indexOf(currentRole || 'user');
+    const nextRole = roles[(currentIdx + 1) % roles.length];
+    
+    if (confirm(`¿Cambiar rol a ${nextRole}?`)) {
+      await updateDoc(doc(db, 'users', uid), { role: nextRole });
+    }
+  };
+
+  const handleFinanceAction = async (item: any, type: 'withdrawal' | 'deposit', status: 'approved' | 'rejected') => {
+    try {
+      const userRef = doc(db, 'users', item.userId);
+      const userSnap = await getDoc(userRef);
+      if (!userSnap.exists()) return;
+      const userData = userSnap.data() as UserProfile;
+
+      if (type === 'withdrawal') {
+        await updateDoc(doc(db, 'withdrawals', item.id), { status });
+        if (status === 'rejected') {
+          // Refund
+          await updateDoc(userRef, { balance: userData.balance + item.amount });
+        } else {
+          // Track total withdrawn
+          await updateDoc(userRef, { totalWithdrawals: (userData.totalWithdrawals || 0) + item.amount });
+        }
+      } else {
+        await updateDoc(doc(db, 'deposits', item.id), { status });
+        if (status === 'approved') {
+          await updateDoc(userRef, { 
+            balance: userData.balance + item.amount,
+            totalDeposits: (userData.totalDeposits || 0) + item.amount
+          });
+        }
+      }
+
+      // Notification
+      const newNotif = {
+        id: Math.random().toString(36).substring(2, 9),
+        type: status === 'approved' ? 'deposit' : 'withdrawal_rejected',
+        title: status === 'approved' ? 'Transacción Aprobada' : 'Transacción Rechazada',
+        message: `Su solicitud de ${type} por ${item.amount} USDT ha sido ${status === 'approved' ? 'procesada exitosamente' : 'denegada por el departamento de seguridad'}.`,
+        timestamp: Timestamp.now(),
+        read: false
+      };
+      await updateDoc(userRef, { notifications: [newNotif, ...(userData.notifications || [])].slice(0, 50) });
+
+      alert('Operación finalizada');
+    } catch (e) {
+      console.error(e);
+      alert('Error procesando finanzas');
+    }
+  };
+
+  const handleEnterLiveMode = (user: UserProfile) => {
+    if (confirm(`¿Desea entrar en MODO LIVE como ${user.displayName}? Podrá ver la interfaz exactamente como él la ve.`)) {
+      localStorage.setItem('qx_impersonate_uid', user.uid);
+      localStorage.setItem('qx_impersonate_name', user.displayName);
+      window.location.reload();
+    }
+  };
+
+  const handleBroadcast = async (title: string, message: string) => {
+    await addDoc(collection(db, 'announcements'), {
+      title,
+      message,
+      timestamp: Timestamp.now(),
+      authorEmail: auth.currentUser?.email
+    });
+  };
+
+  const handleSaveSettings = async (data: Partial<SystemSettings>) => {
+    await updateDoc(doc(db, 'system', 'settings'), data);
+    alert('Configuración guardada');
+  };
+
+  const menuItems = useMemo(() => [
+    { id: 'dashboard', label: 'Monitor Central', icon: LayoutDashboard },
+    { id: 'users', label: 'Control de Usuarios', icon: Users },
+    { id: 'finance', label: 'Gestión Financiera', icon: CreditCard },
+    { id: 'bets', label: 'Riesgo Deportivo', icon: Target },
+    { id: 'security', label: 'Inteligencia & Seguridad', icon: ShieldAlert },
+    { id: 'settings', label: 'Configuración Núcleo', icon: Settings },
+  ], []);
+
+  const activeItem = useMemo(() => menuItems.find(m => m.id === activeTab), [activeTab, menuItems]);
+  const ActiveIcon = activeItem?.icon || LayoutDashboard;
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-brand-bg flex items-center justify-center">
+        <div className="flex flex-col items-center gap-6">
+           <Zap className="w-12 h-12 text-brand-primary animate-pulse" />
+           <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest italic tracking-widest">Sport91FC Control Center • Autologin...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <motion.div 
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="space-y-6"
-    >
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* User Management Title Section */}
-        <div className="bg-brand-surface border border-brand-line p-6 rounded-2xl space-y-4">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-            <div>
-              <h2 className="text-xl font-black uppercase italic tracking-tight flex items-center gap-2 text-white">
-                <Shield className="w-5 h-5 text-brand-primary" />
-                {t.usersMaster}
+    <div className="min-h-screen bg-brand-bg text-white flex overflow-hidden font-sans selection:bg-brand-primary/30">
+      <motion.aside 
+        initial={false}
+        animate={{ width: isSidebarOpen ? 280 : 88 }}
+        className="bg-brand-surface border-r border-white/5 flex flex-col relative z-50 overflow-hidden shadow-[10px_0_40px_rgba(0,0,0,0.5)]"
+      >
+        <div className="p-6 h-24 flex items-center border-b border-white/5 mb-6 group cursor-pointer">
+           <div className="p-3 bg-brand-primary rounded-2xl shrink-0 shadow-[0_0_25px_rgba(223,255,0,0.4)] group-hover:scale-110 transition-transform">
+              <Shield className="w-5 h-5 text-black" />
+           </div>
+           <AnimatePresence>
+             {isSidebarOpen && (
+               <motion.div
+                 initial={{ opacity: 0, x: -10 }}
+                 animate={{ opacity: 1, x: 0 }}
+                 exit={{ opacity: 0, x: -10 }}
+                 className="ml-4 overflow-hidden"
+               >
+                  <h1 className="text-xl font-black italic uppercase tracking-tighter leading-none">Sport91<span className="text-brand-primary">FC</span></h1>
+                  <p className="text-[8px] text-gray-500 font-black uppercase tracking-[0.3em] leading-none mt-1">NUCLEUS OS v2.0</p>
+               </motion.div>
+             )}
+           </AnimatePresence>
+        </div>
+
+        <div className="flex-1 px-4 space-y-6">
+           <div>
+              {isSidebarOpen && <p className="px-4 text-[8px] font-black text-gray-600 uppercase tracking-[0.2em] mb-4">Operaciones</p>}
+              <div className="space-y-1">
+                 {menuItems.slice(0, 3).map((item) => (
+                    <NavButton 
+                       key={item.id} 
+                       item={item} 
+                       active={activeTab === item.id} 
+                       collapsed={!isSidebarOpen} 
+                       onClick={() => setActiveTab(item.id as AdminTab)} 
+                    />
+                 ))}
+              </div>
+           </div>
+
+           <div>
+              {isSidebarOpen && <p className="px-4 text-[8px] font-black text-gray-600 uppercase tracking-[0.2em] mb-4">Riesgo & Datos</p>}
+              <div className="space-y-1">
+                 {menuItems.slice(3, 5).map((item) => (
+                    <NavButton 
+                       key={item.id} 
+                       item={item} 
+                       active={activeTab === item.id} 
+                       collapsed={!isSidebarOpen} 
+                       onClick={() => setActiveTab(item.id as AdminTab)} 
+                    />
+                 ))}
+              </div>
+           </div>
+
+           <div>
+              {isSidebarOpen && <p className="px-4 text-[8px] font-black text-gray-600 uppercase tracking-[0.2em] mb-4">Sistema</p>}
+              <div className="space-y-1">
+                 {menuItems.slice(5).map((item) => (
+                    <NavButton 
+                       key={item.id} 
+                       item={item} 
+                       active={activeTab === item.id} 
+                       collapsed={!isSidebarOpen} 
+                       onClick={() => setActiveTab(item.id as AdminTab)} 
+                    />
+                 ))}
+              </div>
+           </div>
+        </div>
+
+        <div className="p-4 mt-auto border-t border-white/5 space-y-2">
+           <button 
+             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+             className="w-full flex items-center justify-center h-12 rounded-xl text-gray-500 hover:bg-white/5 hover:text-white transition-all group"
+           >
+              <motion.div animate={{ rotate: isSidebarOpen ? 0 : 180 }}>
+                <ArrowRight className="w-4 h-4" />
+              </motion.div>
+           </button>
+           <button 
+             onClick={() => window.location.reload()}
+             className="w-full flex items-center justify-center h-12 bg-red-500/10 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all"
+           >
+              <LogOut className="w-4 h-4" />
+           </button>
+        </div>
+      </motion.aside>
+
+      <main className="flex-1 flex flex-col overflow-hidden relative">
+        <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-brand-primary/[0.03] via-transparent to-transparent pointer-events-none -z-10" />
+
+        <div className="h-10 bg-brand-primary text-black flex items-center px-8 relative z-50 shadow-[0_4px_20px_rgba(223,255,0,0.2)] overflow-hidden">
+           <div className="flex items-center gap-6 animate-marquee whitespace-nowrap">
+              <TickerItem label="EXPOSICIÓN TOTAL" value={formatCurrency(stats.totalDeposited - stats.totalWithdrawn)} />
+              <div className="w-1 h-1 rounded-full bg-black/20" />
+              <TickerItem label="USUARIOS ONLINE" value={stats.activeUsers} pulse />
+              <div className="w-1 h-1 rounded-full bg-black/20" />
+              <TickerItem label="ALFONSO API STATUS" value="OPERATIONAL" green />
+              <div className="w-1 h-1 rounded-full bg-black/20" />
+              <TickerItem label="LATENCIA GLOBAL" value="12ms" />
+              <div className="w-1 h-1 rounded-full bg-black/20" />
+              <TickerItem label="VOLUMEN 24H" value={formatCurrency(stats.totalDeposited / 30)} />
+           </div>
+        </div>
+
+        <header className="h-20 px-8 flex items-center justify-between border-b border-white/5 bg-brand-surface/40 backdrop-blur-2xl z-40">
+           <div className="flex items-center gap-4">
+              <div className="p-2 bg-white/5 rounded-lg border border-white/10">
+                 <ActiveIcon className="w-4 h-4 text-brand-primary" />
+              </div>
+              <h2 className="text-lg font-black text-white italic uppercase tracking-tighter">
+                {activeItem?.label || 'N/A'}
               </h2>
-              <div className="flex gap-4 mt-2">
-                 <button 
-                   onClick={() => setActiveTabPanel('users')}
-                   className={cn(
-                     "text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full transition-all",
-                     activeTabPanel === 'users' ? "bg-brand-primary text-black" : "text-gray-500 hover:text-white bg-white/5"
-                   )}
-                 >
-                   Usuarios
+           </div>
+
+           <div className="flex items-center gap-4">
+              <div className="hidden lg:flex items-center gap-2 bg-black/40 border border-white/5 rounded-xl px-4 py-2">
+                 <Search className="w-3.5 h-3.5 text-gray-500" />
+                 <input 
+                   type="text" 
+                   placeholder="Quick search (CMD+K)" 
+                   className="bg-transparent border-none focus:ring-0 text-[10px] font-black uppercase text-white placeholder:text-gray-700 w-48"
+                 />
+              </div>
+              
+              <div className="flex items-center gap-2 pl-4 border-l border-white/5">
+                 <button className="p-2.5 hover:bg-white/5 rounded-xl text-gray-500 hover:text-white transition-all">
+                    <Bell className="w-4 h-4" />
                  </button>
-                 <button 
-                   onClick={() => setActiveTabPanel('withdrawals')}
-                   className={cn(
-                     "text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full transition-all",
-                     activeTabPanel === 'withdrawals' ? "bg-brand-primary text-black" : "text-gray-500 hover:text-white bg-white/5"
-                   )}
-                 >
-                   Retiros ({withdrawals.filter(w => w.status === 'pending').length})
-                 </button>
-                 <button 
-                   onClick={() => setActiveTabPanel('tickets')}
-                   className={cn(
-                     "text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full transition-all",
-                     activeTabPanel === 'tickets' ? "bg-brand-primary text-black" : "text-gray-500 hover:text-white bg-white/5"
-                   )}
-                 >
-                   Tickets ({tickets.filter(t => t.status === 'pending').length})
+                 <button className="p-2.5 hover:bg-white/5 rounded-xl text-gray-500 hover:text-white transition-all">
+                    <Settings className="w-4 h-4" />
                  </button>
               </div>
-            </div>
-            <div className="relative w-full md:w-48">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-              <input 
-                type="text" 
-                placeholder={t.searchUsers} 
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full bg-black/40 border border-brand-line rounded-lg pl-10 pr-4 py-2 text-[10px] focus:outline-none focus:border-brand-primary transition-all"
-              />
-            </div>
-          </div>
-        </div>
+           </div>
+        </header>
 
-        {/* API Sync Section */}
-        <div className="bg-brand-surface border border-brand-line p-6 rounded-2xl flex items-center justify-between">
-          <div>
-            <h2 className="text-xl font-black uppercase italic tracking-tight flex items-center gap-2 text-white text-brand-primary">
-              <Trophy className="w-5 h-5" />
-              API DEPORTIVA
-            </h2>
-            <div className="flex items-center gap-2 mt-1">
-               <History className="w-3 h-3 text-gray-500" />
-               <p className="text-[9px] text-gray-500 font-mono uppercase">
-                 Última Sinc: {lastSyncInfo ? format(lastSyncInfo.date, 'dd/MM HH:mm') : 'NUNCA'} ({lastSyncInfo?.count || 0} event)
-               </p>
-            </div>
-          </div>
-          <button 
-            onClick={syncMatches}
-            disabled={isSyncing}
-            className={cn(
-              "flex items-center gap-2 px-6 py-3 rounded-xl text-[10px] font-black uppercase transition-all shadow-lg",
-              isSyncing ? "bg-gray-800 text-gray-600 animate-pulse" : "bg-red-600 text-white hover:bg-red-500 active:scale-95"
-            )}
-          >
-            <RefreshCcw className={cn("w-4 h-4", isSyncing && "animate-spin")} />
-            {isSyncing ? 'Sincronizando...' : 'Sincronizar'}
-          </button>
-        </div>
-      </div>
-
-      <div className="bg-brand-surface border border-brand-line rounded-2xl overflow-hidden shadow-2xl">
-        <div className="overflow-x-auto">
-          {activeTabPanel === 'users' ? (
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-brand-bg/50">
-                  <th className="data-grid-header px-6 py-4">{t.userLabel}</th>
-                  <th className="data-grid-header px-6 py-4">MONITOR</th>
-                  <th className="data-grid-header px-6 py-4">{t.currentBalance}</th>
-                  <th className="data-grid-header px-6 py-4">{t.actions}</th>
-                  <th className="data-grid-header px-6 py-4">{t.privileges}</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-brand-line">
-                {filteredUsers.map(user => (
-                  <tr key={user.uid} className="hover:bg-white/[0.02] transition-colors group">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-brand-primary/10 flex items-center justify-center text-brand-primary font-bold text-xs ring-1 ring-brand-primary/20">
-                          {user.displayName.charAt(0)}
-                        </div>
-                        <div>
-                          <p className="text-sm font-bold">{user.displayName}</p>
-                          <p className="text-[10px] text-gray-500 font-mono italic">{user.email}</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                       <div className="flex items-center gap-2">
-                          <button 
-                            onClick={() => setSelectedUserForMonitor(user)}
-                            className="p-2 bg-blue-500/10 text-blue-500 rounded-lg hover:bg-blue-500/20 transition-all group/btn"
-                            title="Monitor User"
-                          >
-                             <Eye className="w-4 h-4 group-hover/btn:scale-110 transition-transform" />
-                          </button>
-                          <button 
-                            onClick={() => alert(`Iniciando modo live para: ${user.email}\n(Función restringida por seguridad)`)}
-                            className="p-2 bg-emerald-500/10 text-emerald-500 rounded-lg hover:bg-emerald-500/20 transition-all group/btn"
-                            title="Impersonate"
-                          >
-                             <Zap className="w-4 h-4 group-hover/btn:scale-110 transition-transform" />
-                          </button>
-                       </div>
-                    </td>
-                    <td className="px-6 py-4 font-mono text-sm font-bold text-green-500">
-                      {formatCurrency(user.balance)}
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <button 
-                          onClick={() => adjustBalance(user.uid, user.balance, 100)}
-                          className="p-1.5 bg-green-500/10 text-green-500 rounded-md hover:bg-green-500/20 transition-all"
-                          title="Add $100"
-                        >
-                          <Plus className="w-4 h-4" />
-                        </button>
-                        <button 
-                          onClick={() => adjustBalance(user.uid, user.balance, -100)}
-                          className="p-1.5 bg-red-500/10 text-red-500 rounded-md hover:bg-red-500/20 transition-all"
-                          title="Subtract $100"
-                        >
-                          <Minus className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <button 
-                        onClick={() => toggleAdmin(user.uid, user.role)}
-                        className={cn(
-                          "flex items-center gap-2 px-3 py-1.5 rounded-full text-[10px] font-black uppercase transition-all",
-                          user.role === 'admin' 
-                            ? "bg-brand-primary text-black" 
-                            : "bg-brand-line text-gray-500 hover:text-gray-300"
-                        )}
-                      >
-                        {user.role === 'admin' ? <Shield className="w-3 h-3" /> : <Users className="w-3 h-3" />}
-                        {user.role === 'admin' ? t.administrator : t.userLabel}
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          ) : activeTabPanel === 'withdrawals' ? (
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-brand-bg/50">
-                  <th className="data-grid-header px-6 py-4">FECHA</th>
-                  <th className="data-grid-header px-6 py-4">USUARIO</th>
-                  <th className="data-grid-header px-6 py-4">CANTIDAD</th>
-                  <th className="data-grid-header px-6 py-4">DESTINO</th>
-                  <th className="data-grid-header px-6 py-4">ESTADO</th>
-                  <th className="data-grid-header px-6 py-4 text-right">ACCIONES</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-brand-line">
-                {withdrawals.map(w => {
-                  const u = users.find(u => u.uid === w.userId);
-                  return (
-                    <tr key={w.id} className="hover:bg-white/[0.02] transition-colors">
-                      <td className="px-6 py-4 text-[10px] font-mono text-gray-500 uppercase">
-                        {w.createdAt?.toDate ? format(w.createdAt.toDate(), 'dd/MM HH:mm') : '---'}
-                      </td>
-                      <td className="px-6 py-4">
-                         <p className="text-xs font-bold">{u?.displayName || 'Desconocido'}</p>
-                         <p className="text-[10px] text-gray-500 font-mono italic">{u?.email}</p>
-                      </td>
-                      <td className="px-6 py-4 font-mono text-sm font-bold text-red-400">
-                        {formatCurrency(w.amount)}
-                      </td>
-                      <td className="px-6 py-4">
-                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-tighter">{w.network}</p>
-                        <p className="text-[9px] font-mono text-gray-600 truncate max-w-[120px]">{w.address}</p>
-                      </td>
-                      <td className="px-6 py-4">
-                         <span className={cn(
-                           "px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest",
-                           w.status === 'pending' ? "bg-amber-500/10 text-amber-500 border border-amber-500/20" :
-                           w.status === 'approved' ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20" :
-                           "bg-red-500/10 text-red-500 border border-red-500/20"
-                         )}>
-                           {w.status}
-                         </span>
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        {w.status === 'pending' && (
-                          <div className="flex items-center justify-end gap-2">
-                             <button 
-                               onClick={() => handleWithdrawalAction(w, 'approved')}
-                               className="p-1 px-3 bg-emerald-500 text-black rounded-lg text-[9px] font-black uppercase tracking-tighter hover:bg-emerald-400 active:scale-95 transition-all"
-                             >
-                               Aprobar
-                             </button>
-                             <button 
-                               onClick={() => handleWithdrawalAction(w, 'rejected')}
-                               className="p-1 px-3 bg-red-500 text-white rounded-lg text-[9px] font-black uppercase tracking-tighter hover:bg-red-400 active:scale-95 transition-all"
-                             >
-                               Rechazar
-                             </button>
-                          </div>
-                        )}
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          ) : (
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-brand-bg/50">
-                  <th className="data-grid-header px-6 py-4">TICKET ID / FECHA</th>
-                  <th className="data-grid-header px-6 py-4">USUARIO</th>
-                  <th className="data-grid-header px-6 py-4">ASUNTO / MENSAJE</th>
-                  <th className="data-grid-header px-6 py-4">ESTADO</th>
-                  <th className="data-grid-header px-6 py-4 text-right">ACCIONES</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-brand-line">
-                {tickets.map(tk => {
-                  const u = users.find(u => u.uid === tk.userId);
-                  return (
-                    <tr key={tk.id} className="hover:bg-white/[0.02] transition-colors group">
-                      <td className="px-6 py-4">
-                         <p className="text-[10px] font-mono font-black text-brand-primary uppercase">#{tk.id.slice(0, 8)}</p>
-                         <p className="text-[9px] text-gray-500 uppercase mt-1">
-                           {tk.createdAt?.toDate ? format(tk.createdAt.toDate(), 'dd/MM HH:mm') : '---'}
-                         </p>
-                      </td>
-                      <td className="px-6 py-4">
-                         <p className="text-xs font-bold">{u?.displayName || 'Cliente'}</p>
-                         <p className="text-[10px] text-gray-500 font-mono italic">{u?.email || tk.email}</p>
-                      </td>
-                      <td className="px-6 py-4 max-w-xs">
-                         <p className="text-[10px] font-black text-white italic uppercase truncate mb-1">{tk.subject}</p>
-                         <p className="text-[10px] text-gray-500 leading-tight line-clamp-2">{tk.message}</p>
-                      </td>
-                      <td className="px-6 py-4">
-                         <span className={cn(
-                           "px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest",
-                           tk.status === 'pending' ? "bg-blue-500/10 text-blue-500 border border-blue-500/20" :
-                           tk.status === 'resolved' ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20" :
-                           "bg-gray-500/10 text-gray-500 border border-gray-500/20"
-                         )}>
-                           {tk.status === 'pending' ? 'Pendiente' : tk.status === 'resolved' ? 'Resuelto' : 'Cerrado'}
-                         </span>
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        {tk.status === 'pending' && (
-                          <div className="flex items-center justify-end gap-2">
-                             <button 
-                               onClick={() => handleTicketAction(tk.id, 'resolved')}
-                               className="p-1 px-3 bg-emerald-500 text-black rounded-lg text-[9px] font-black uppercase tracking-tighter hover:bg-emerald-400 active:scale-95 transition-all"
-                             >
-                               Resolver
-                             </button>
-                             <button 
-                               onClick={() => handleTicketAction(tk.id, 'closed')}
-                               className="p-1 px-3 bg-white/5 text-white rounded-lg text-[9px] font-black uppercase tracking-tighter hover:bg-white/10 active:scale-95 transition-all"
-                             >
-                               Cerrar
-                             </button>
-                          </div>
-                        )}
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          )}
-        </div>
-      </div>
-
-      {/* MONITOR MODAL */}
-      <AnimatePresence>
-        {selectedUserForMonitor && (
-          <div className="fixed inset-0 z-[4000] flex items-end md:items-center justify-center p-4">
-            <motion.div 
-               initial={{ opacity: 0 }}
-               animate={{ opacity: 1 }}
-               exit={{ opacity: 0 }}
-               onClick={() => setSelectedUserForMonitor(null)}
-               className="fixed inset-0 bg-black/90 backdrop-blur-sm"
-            />
+        <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
+          <AnimatePresence mode="wait">
             <motion.div
-               initial={{ opacity: 0, y: 100, scale: 0.9 }}
-               animate={{ opacity: 1, y: 0, scale: 1 }}
-               exit={{ opacity: 0, y: 100, scale: 0.9 }}
-               className="w-full max-w-lg bg-brand-bg border border-brand-line rounded-[2.5rem] p-8 relative overflow-hidden z-20 shadow-2xl"
+              key={activeTab}
+              initial={{ opacity: 0, y: 10, scale: 0.99 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -10, scale: 0.99 }}
+              transition={{ type: "spring", damping: 20, stiffness: 100 }}
+              className="max-w-[1600px] mx-auto"
             >
-               <div className="flex items-center justify-between mb-8">
-                  <div className="flex items-center gap-4">
-                     <div className="w-16 h-16 rounded-2xl bg-brand-primary/10 flex items-center justify-center text-brand-primary text-2xl font-black italic">
-                        {selectedUserForMonitor.displayName.charAt(0)}
-                     </div>
-                     <div>
-                        <h2 className="text-xl font-black text-white italic uppercase tracking-tighter">
-                           {selectedUserForMonitor.displayName}
-                        </h2>
-                        <p className="text-[10px] text-gray-500 font-mono">{selectedUserForMonitor.email}</p>
-                     </div>
-                  </div>
-                  <button 
-                    onClick={() => setSelectedUserForMonitor(null)}
-                    className="p-3 bg-white/5 rounded-2xl text-gray-400 hover:text-white"
-                  >
-                     <Zap className="w-6 h-6 rotate-45" />
-                  </button>
-               </div>
-
-               <div className="grid grid-cols-2 gap-4 mb-8">
-                  <div className="bg-brand-surface border border-white/5 p-5 rounded-3xl">
-                     <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1">Balance Actual</p>
-                     <p className="text-xl font-mono font-black text-emerald-500">{formatCurrency(selectedUserForMonitor.balance)}</p>
-                  </div>
-                  <div className="bg-brand-surface border border-white/5 p-5 rounded-3xl">
-                     <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1">Rol Sistema</p>
-                     <p className={cn(
-                       "text-xs font-mono font-black uppercase",
-                       selectedUserForMonitor.role === 'admin' ? "text-brand-primary" : "text-gray-400"
-                     )}>
-                       {selectedUserForMonitor.role || 'user'}
-                     </p>
-                  </div>
-                  <div className="bg-brand-surface border border-white/5 p-5 rounded-3xl">
-                     <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1">Beneficio Semanal</p>
-                     <p className="text-xl font-mono font-black text-blue-500">{formatCurrency(selectedUserForMonitor.weeklyProfit || 0)}</p>
-                  </div>
-                  <div className="bg-brand-surface border border-white/5 p-5 rounded-3xl">
-                     <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1">Fecha Registro</p>
-                     <p className="text-xs font-mono font-black text-gray-400 uppercase">
-                        {selectedUserForMonitor.createdAt?.toDate ? format(selectedUserForMonitor.createdAt.toDate(), 'dd/MM/yyyy') : '---'}
-                     </p>
-                  </div>
-               </div>
-
-               {userBetsForMonitor.length > 0 && (
-                 <div className="mb-8">
-                    <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-3 flex items-center gap-2">
-                       <Activity className="w-3 h-3 text-brand-primary" />
-                       Últimas Órdenes (Beta Live)
-                    </p>
-                    <div className="space-y-2">
-                       {userBetsForMonitor.map(bet => (
-                         <div key={bet.id} className="bg-black/40 border border-white/5 p-3 rounded-2xl flex justify-between items-center">
-                            <div>
-                               <p className="text-[10px] font-bold text-white uppercase italic">{bet.homeTeam} vs {bet.awayTeam}</p>
-                               <p className="text-[9px] text-gray-500 font-mono">Anti {bet.selectedScore} • {formatCurrency(bet.amount)}</p>
-                            </div>
-                            <span className={cn(
-                              "text-[8px] font-black uppercase px-2 py-0.5 rounded border",
-                              bet.status === 'won' ? "text-emerald-500 border-emerald-500/20 bg-emerald-500/5" :
-                              bet.status === 'lost' ? "text-red-500 border-red-500/20 bg-red-500/5" :
-                              "text-blue-500 border-blue-500/20 bg-blue-500/5"
-                            )}>
-                               {bet.status}
-                            </span>
-                         </div>
-                       ))}
-                    </div>
-                 </div>
-               )}
-
-               <div className="space-y-3">
-                  <button 
-                    onClick={() => {
-                        window.open(`mailto:${selectedUserForMonitor.email}`);
-                    }}
-                    className="w-full flex items-center justify-between p-4 bg-white/5 hover:bg-white/10 rounded-2xl transition-all group"
-                  >
-                     <span className="text-xs font-black text-white italic uppercase tracking-widest">Enviar comunicación</span>
-                     <ExternalLink className="w-4 h-4 text-brand-primary group-hover:scale-110 transition-transform" />
-                  </button>
-                  <button 
-                    onClick={() => {
-                        const newBalance = prompt('Ingrese el nuevo balance para este usuario:', selectedUserForMonitor.balance.toString());
-                        if (newBalance !== null) {
-                            const val = parseFloat(newBalance);
-                            if (!isNaN(val)) adjustBalance(selectedUserForMonitor.uid, selectedUserForMonitor.balance, val - selectedUserForMonitor.balance);
-                        }
-                    }}
-                    className="w-full flex items-center justify-between p-4 bg-white/5 hover:bg-white/10 rounded-2xl transition-all group"
-                  >
-                     <span className="text-xs font-black text-white italic uppercase tracking-widest">Ajuste de Saldo Manual</span>
-                     <CreditCard className="w-4 h-4 text-emerald-500 group-hover:scale-110 transition-transform" />
-                  </button>
-                  <button 
-                    onClick={() => {
-                        if (confirm(`¿Desea cambiar el rol de este usuario? (Estado actual: ${selectedUserForMonitor.role || 'user'})`)) {
-                            toggleAdmin(selectedUserForMonitor.uid, selectedUserForMonitor.role);
-                            setSelectedUserForMonitor(null);
-                        }
-                    }}
-                    className="w-full flex items-center justify-between p-4 bg-red-500/10 hover:bg-red-500/20 border border-red-500/10 rounded-2xl transition-all group"
-                  >
-                     <span className="text-xs font-black text-red-500 italic uppercase tracking-widest">Alternar Privilegios Admin</span>
-                     <Shield className="w-4 h-4 text-red-500 group-hover:scale-110 transition-transform" />
-                  </button>
-               </div>
+              {activeTab === 'dashboard' && <DashboardStats stats={stats} />}
+              {activeTab === 'users' && (
+                <UserManagement 
+                   users={users} 
+                   onAdjustBalance={handleAdjustBalance}
+                   onToggleRole={handleToggleRole}
+                   onEnterLiveMode={handleEnterLiveMode}
+                   onUpdateUser={(uid, data) => updateDoc(doc(db, 'users', uid), data)}
+                />
+              )}
+              {activeTab === 'finance' && <FinanceHub />}
+              {activeTab === 'bets' && <BettingManager />}
+              {activeTab === 'security' && <SecurityCenter />}
+              {activeTab === 'settings' && systemSettings && (
+                <SystemSettingsManager 
+                   settings={systemSettings}
+                   onSave={handleSaveSettings}
+                   onBroadcast={handleBroadcast}
+                 />
+              )}
             </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-    </motion.div>
+          </AnimatePresence>
+        </div>
+      </main>
+    </div>
   );
+}
+
+function NavButton({ item, active, onClick, collapsed }: any) {
+  const Icon = item.icon;
+  return (
+      <button
+         onClick={onClick}
+         className={cn(
+            "w-full flex items-center gap-4 px-4 py-3.5 rounded-xl transition-all group relative",
+            active 
+               ? "bg-brand-primary text-black shadow-[0_0_20px_rgba(223,255,0,0.2)]" 
+               : "text-gray-500 hover:bg-white/5 hover:text-white"
+         )}
+      >
+         <Icon className={cn(
+            "w-4 h-4 shrink-0 transition-transform", 
+            active ? "text-black" : "text-gray-500 group-hover:text-brand-primary",
+            !active && "group-hover:scale-110"
+         )} />
+         {!collapsed && (
+            <span className="text-[10px] font-black uppercase tracking-widest italic truncate">{item.label}</span>
+         )}
+         {active && (
+            <motion.div 
+               layoutId="active-indicator"
+               className="absolute left-0 w-1 h-1/2 bg-black rounded-r-full"
+            />
+         )}
+      </button>
+   );
+}
+
+function TickerItem({ label, value, pulse, green }: any) {
+   return (
+      <div className="flex items-center gap-2">
+         <span className="text-[8px] font-black text-black/50 uppercase tracking-tighter">{label}</span>
+         <div className="flex items-center gap-1.5">
+            {pulse && <div className="w-1 h-1 rounded-full bg-black animate-pulse" />}
+            <span className={cn(
+               "text-[10px] font-black italic uppercase",
+               green ? "text-green-900" : "text-black"
+            )}>{value}</span>
+         </div>
+      </div>
+   );
 }

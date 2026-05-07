@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import { UserProfile } from '../types';
 import { auth } from '../lib/firebase';
 import { formatCurrency, cn } from '../lib/utils';
+import AvatarPicker from './AvatarPicker';
 import { 
   Eye, 
   EyeOff, 
@@ -23,7 +24,9 @@ import {
   Headphones,
   Info,
   ListTodo,
-  Terminal
+  Terminal,
+  Camera,
+  Gem
 } from 'lucide-react';
 
 interface ProfileViewProps {
@@ -70,7 +73,9 @@ export default function ProfileView({
   onAdminClick
 }: ProfileViewProps) {
   const [showBalance, setShowBalance] = useState(true);
-  const referralLink = `https://sport91fc.com?ref=${profile?.uid?.slice(0, 8) || '000000'}`;
+  const [showAvatarPicker, setShowAvatarPicker] = useState(false);
+  const userReferralCode = profile?.referralCode || profile?.uid?.slice(0, 6).toUpperCase() || '000000';
+  const referralLink = `${window.location.origin}?ref=${userReferralCode}`;
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
@@ -117,33 +122,71 @@ export default function ProfileView({
     >
       {/* Header Profile Info */}
       <div className="flex items-center gap-3 px-2">
-         <div className="relative">
-            <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full border-2 border-brand-primary/30 p-1 bg-gradient-to-tr from-brand-primary/20 to-transparent">
-               <div className="w-full h-full rounded-full bg-brand-surface border border-white/10 flex items-center justify-center overflow-hidden">
+         <div className="relative group/avatar">
+            <div 
+              onClick={() => setShowAvatarPicker(true)}
+              className="w-16 h-16 sm:w-20 sm:h-20 rounded-full border-2 border-brand-primary/30 p-1 bg-gradient-to-tr from-brand-primary/20 to-transparent cursor-pointer relative"
+            >
+               <div className="w-full h-full rounded-full bg-brand-surface border border-white/10 flex items-center justify-center overflow-hidden relative">
                   <img 
-                    src="https://img.icons8.com/isometric/100/football.png" 
+                    src={profile?.photoURL || "https://img.icons8.com/isometric/100/football.png"} 
                     alt="avatar" 
-                    className="w-12 h-12" 
+                    className="w-12 h-12 sm:w-16 sm:h-16 object-contain" 
                     referrerPolicy="no-referrer"
                   />
+                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover/avatar:opacity-100 transition-opacity">
+                    <Camera className="w-5 h-5 sm:w-6 sm:h-6 text-brand-primary" />
+                  </div>
                </div>
             </div>
-            <div className="absolute -bottom-1 -right-1 bg-white/10 backdrop-blur-md rounded-full px-2 py-1 border border-white/20">
-               <span className="text-xs font-black italic text-brand-primary">VIP{profile?.vipLevel || 0}</span>
+            
+            {/* VIP Level Diamond Display */}
+            <div className="absolute -bottom-1 -right-1 flex items-center gap-0.5">
+               <div className="bg-brand-surface/80 backdrop-blur-md rounded-full pl-1 pr-2 py-0.5 border border-white/10 flex items-center gap-1 shadow-[0_4px_10px_rgba(0,0,0,0.3)]">
+                  <motion.div
+                    animate={{ rotate: [0, 360] }}
+                    transition={{ duration: 4, repeat: Infinity, ease: 'linear' }}
+                  >
+                    <Gem className={cn(
+                      "w-3 h-3",
+                      profile?.vipLevel === 0 ? "text-gray-400" : "text-brand-primary"
+                    )} />
+                  </motion.div>
+                  <span className="text-[10px] font-black italic text-white leading-none">VIP{profile?.vipLevel || 0}</span>
+               </div>
             </div>
          </div>
          <div className="flex-1">
-            <div className="flex items-center gap-2">
-               <h2 className="text-2xl font-black text-white italic">{profile?.displayName || 'Guest'}</h2>
-               <div className="flex items-center gap-1 bg-white/5 border border-white/10 rounded px-2 py-0.5">
-                  <span className="text-[10px] font-black text-brand-primary italic">VIP{profile?.vipLevel || 0}</span>
+            <div className="flex flex-col">
+               <div className="flex items-center gap-2">
+                  <h2 className="text-2xl font-black text-white italic tracking-tighter leading-none">{profile?.displayName || 'Guest'}</h2>
+               </div>
+               <div className="flex items-center gap-3 mt-2">
+                  <div className="flex items-center gap-1 bg-brand-primary/10 border border-brand-primary/20 rounded-full px-2.5 py-0.5">
+                    <Gem className="w-2.5 h-2.5 text-brand-primary" />
+                    <span className="text-[8px] font-black text-brand-primary uppercase italic">Premium Holder</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    {[...Array(Math.min(5, profile?.vipLevel || 0))].map((_, i) => (
+                      <motion.div 
+                        key={i}
+                        initial={{ opacity: 0, scale: 0 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ delay: i * 0.1 }}
+                      >
+                        <Gem className="w-2 h-2 text-brand-primary shadow-[0_0_8px_rgba(223,255,0,0.5)] fill-brand-primary" />
+                      </motion.div>
+                    ))}
+                  </div>
                </div>
             </div>
-            <div className="flex items-center gap-2 mt-1">
-               <span className="text-xs font-bold text-gray-500">ID: {profile?.uid?.slice(0, 6).toUpperCase() || '000000'}</span>
-               <button onClick={() => copyToClipboard(profile?.uid || '')} className="text-emerald-500 hover:text-emerald-400">
-                  <Copy className="w-3 h-3" />
-               </button>
+            <div className="flex items-center gap-2 mt-2">
+               <div className="px-2 py-0.5 bg-white/5 rounded border border-white/10 flex items-center gap-1.5">
+                  <span className="text-[10px] font-bold text-gray-500 tracking-wider">ID: {userReferralCode}</span>
+                  <button onClick={() => copyToClipboard(userReferralCode)} className="text-gray-400 hover:text-brand-primary transition-colors">
+                     <Copy className="w-2.5 h-2.5" />
+                  </button>
+               </div>
             </div>
          </div>
          <button 
@@ -329,6 +372,17 @@ export default function ProfileView({
       >
         {t.logout}
       </button>
+
+      <AnimatePresence>
+        {showAvatarPicker && (
+          <AvatarPicker 
+            onClose={() => setShowAvatarPicker(false)}
+            userId={profile?.uid || ''}
+            currentAvatar={profile?.photoURL}
+            onUpdate={() => {}} // Local state will update via Firestore listener
+          />
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }

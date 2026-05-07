@@ -19,10 +19,12 @@ async function startServer() {
   app.all('/api/football/*', async (req, res) => {
     const apiKey = process.env.FOOTBALL_API_KEY;
     
-    if (!apiKey || apiKey.trim() === '') {
-      console.error('FOOTBALL_API_KEY is missing');
-      return res.status(500).json({ 
-        error: 'FOOTBALL_API_KEY is not configured. Please set it in the environment variables.' 
+    if (!apiKey || apiKey.trim() === '' || apiKey === 'YOUR_FOOTBALL_API_KEY') {
+      console.warn('FOOTBALL_API_KEY is not configured');
+      return res.status(200).json({ 
+        warning: 'FOOTBALL_API_KEY is not configured',
+        response: [],
+        results: 0
       });
     }
 

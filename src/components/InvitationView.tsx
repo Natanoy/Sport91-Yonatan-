@@ -43,7 +43,7 @@ export default function InvitationView({ profile, t }: InvitationViewProps) {
         {showInvite && (
           <InviteModal 
             onClose={() => setShowInvite(false)} 
-            userId={profile?.uid || '00000000'} 
+            referralCode={profile?.referralCode || profile?.uid?.slice(0, 6).toUpperCase() || '000000'} 
             t={t} 
           />
         )}

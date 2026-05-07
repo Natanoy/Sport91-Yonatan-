@@ -34,6 +34,7 @@ import SettingsModal from './components/SettingsModal';
 import SecurityModal from './components/SecurityModal';
 import ResultsModal from './components/ResultsModal';
 import NotificationsModal from './components/NotificationsModal';
+import AboutModal from './components/AboutModal';
 import { formatCurrency, getTeamLogo, cn } from './lib/utils';
 import { 
   Search, 
@@ -54,7 +55,8 @@ import {
   Clock,
   LayoutDashboard,
   Copy,
-  Calendar
+  Calendar,
+  Zap
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -243,6 +245,16 @@ export default function App() {
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showResultsModal, setShowResultsModal] = useState(false);
   const [showNotificationsModal, setShowNotificationsModal] = useState(false);
+  const [showAboutModal, setShowAboutModal] = useState(false);
+
+  // Capture referral code from URL
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const ref = params.get('ref');
+    if (ref) {
+      localStorage.setItem('referralCode', ref);
+    }
+  }, []);
 
   const addNotification = async (type: UserNotification['type'], title: string, message: string, amount?: number) => {
     if (!user || !profile) return;
@@ -322,19 +334,26 @@ export default function App() {
       return;
     }
 
-    const unsub = onSnapshot(doc(db, 'users', user.uid), async (docSnap) => {
+    // Check for Impersonation (Modo LIVE)
+    const impersonateUID = localStorage.getItem('qx_impersonate_uid');
+    const targetUID = impersonateUID || user.uid;
+
+    const unsub = onSnapshot(doc(db, 'users', targetUID), async (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
         // Self-heal: ensure email is in profile if it exists in auth but not in doc
-        if (!data.email && user.email) {
+        if (!data.email && targetUID === user.uid && user.email) {
           await setDoc(doc(db, 'users', user.uid), { email: user.email }, { merge: true });
         }
         // Self-heal: elevate super admin if needed
-        if (user.email === 'ortegayonatan426@gmail.com' && data.role !== 'admin') {
+        if (user.email === 'ortegayonatan426@gmail.com' && data.role !== 'admin' && targetUID === user.uid) {
           await setDoc(doc(db, 'users', user.uid), { role: 'admin' }, { merge: true });
         }
         setProfile(data as UserProfile);
-      } else {
+      } else if (targetUID === user.uid) {
+        const refCode = user.uid.slice(0, 6).toUpperCase();
+        const invitedBy = localStorage.getItem('referralCode');
+        
         const newProfile: UserProfile = {
           uid: user.uid,
           email: user.email || '',
@@ -343,20 +362,31 @@ export default function App() {
           checkInStreak: 0,
           lastCheckInDate: '',
           vipLevel: 0,
+          referralCode: refCode,
+          referredBy: invitedBy || '',
+          referralStatus: 'active',
           createdAt: serverTimestamp()
         };
         try {
           await setDoc(doc(db, 'users', user.uid), newProfile);
+          // Optional: Clear referral code after use
+          localStorage.removeItem('referralCode');
         } catch (err) {
           console.error("Error creating profile:", err);
         }
       }
     }, (err) => {
-      handleFirestoreError(err, OperationType.GET, `users/${user.uid}`);
+      handleFirestoreError(err, OperationType.GET, `users/${targetUID}`);
     });
 
     return () => unsub();
   }, [user]);
+
+  const handleExitLiveMode = () => {
+    localStorage.removeItem('qx_impersonate_uid');
+    localStorage.removeItem('qx_impersonate_name');
+    window.location.reload();
+  };
 
   useEffect(() => {
     if (!profile) return;
@@ -504,6 +534,7 @@ export default function App() {
     setShowRewardsModal(false);
     setShowVipModal(false);
     setShowSupport(false);
+    setShowAboutModal(false);
     setSelectedMatch(null);
   };
 
@@ -519,8 +550,32 @@ export default function App() {
   );
 
   if (loading) return (
-    <div className="min-h-screen bg-brand-bg flex items-center justify-center">
-      <div className="w-12 h-12 border-4 border-brand-primary border-t-transparent rounded-full animate-spin" />
+    <div className="min-h-screen bg-brand-bg flex flex-col items-center justify-center gap-8">
+      <motion.div 
+        animate={{ 
+          scale: [0.95, 1, 0.95],
+          opacity: [0.6, 1, 0.6]
+        }}
+        transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+        className="w-32 h-32 overflow-hidden flex items-center justify-center"
+      >
+         <img 
+           src="https://storage.googleapis.com/test-media-store/6b8d234d-ed12-40de-99f1-610196726884/p-a3967484-904d-4bc5-9c92-3c35b62e49c7.png" 
+           className="w-full h-full object-contain scale-[2.2] translate-y-[-5%] translate-x-[-15%]" 
+           alt="Logo" 
+         />
+      </motion.div>
+      <div className="flex flex-col items-center gap-2">
+        <div className="w-48 h-1 bg-white/5 rounded-full overflow-hidden">
+           <motion.div 
+             initial={{ x: '-100%' }}
+             animate={{ x: '100%' }}
+             transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
+             className="w-full h-full bg-brand-primary" 
+           />
+        </div>
+        <span className="text-[10px] font-black tracking-[0.3em] uppercase text-gray-500 italic">Sport91 FC</span>
+      </div>
     </div>
   );
 
@@ -591,6 +646,23 @@ export default function App() {
 
   return (
     <div className="min-h-[100dvh] h-[100dvh] bg-brand-bg text-white flex flex-col overflow-hidden">
+      {/* Impersonation Banner */}
+      {localStorage.getItem('qx_impersonate_uid') && (
+        <div className="fixed top-0 left-0 right-0 z-[10000] bg-emerald-500 text-black px-4 py-2 flex items-center justify-between shadow-2xl border-b border-black/10">
+           <div className="flex items-center gap-3">
+              <Zap className="w-4 h-4 fill-black animate-pulse" />
+              <span className="text-[10px] font-black uppercase italic tracking-widest">
+                MODO LIVE ACTIVO: <span className="underline">{localStorage.getItem('qx_impersonate_name')}</span>
+              </span>
+           </div>
+           <button 
+             onClick={handleExitLiveMode}
+             className="px-4 py-1 bg-black text-white text-[10px] font-black uppercase rounded-lg hover:bg-black/80 transition-colors shadow-lg active:scale-95"
+           >
+              Salir del Modo Live
+           </button>
+        </div>
+      )}
       <Navbar profile={profile} onRecharge={() => {}} onShowSupport={() => setShowSupport(true)} />
 
       <main className="flex-1 max-w-7xl mx-auto w-full p-4 sm:p-8 overflow-y-auto safe-area-bottom pb-32">
@@ -861,7 +933,7 @@ export default function App() {
                onNotificationsClick={() => setShowNotificationsModal(true)}
                onResultsClick={() => setShowResultsModal(true)}
                onAdminClick={() => handleTabChange('admin')}
-               onAboutClick={() => setShowSupport(true)}
+               onAboutClick={() => setShowAboutModal(true)}
                onLanguageClick={() => setShowSupport(true)}
                onBalanceDetailsClick={() => handleTabChange('trade')}
                onWalletSettingsClick={() => setShowWalletSettings(true)}
@@ -1015,6 +1087,12 @@ export default function App() {
             onClose={() => setShowNotificationsModal(false)}
             onMarkAsRead={handleMarkAsRead}
             onClearAll={handleClearAllNotifications}
+          />
+        )}
+        {showAboutModal && (
+          <AboutModal 
+            onClose={() => setShowAboutModal(false)}
+            t={t}
           />
         )}
       </AnimatePresence>

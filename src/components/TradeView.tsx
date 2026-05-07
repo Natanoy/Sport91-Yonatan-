@@ -70,54 +70,55 @@ export default function TradeView({ bets, t }: TradeViewProps) {
         </div>
       </div>
 
-      {/* Transactions List */}
-      <div className="bg-brand-surface rounded-[2.5rem] border border-white/5 shadow-2xl overflow-hidden min-h-[400px]">
-         <div className="p-8 border-b border-white/5">
-            <h3 className="text-xl font-black italic uppercase tracking-tighter text-white">{t.openTransactions}</h3>
-         </div>
-
-         {openBets.length > 0 ? (
-            <div className="p-6 space-y-4">
-               {openBets.map((bet) => (
-                  <div key={bet.id} className="bg-black/20 rounded-3xl p-5 border border-white/5 flex flex-col gap-3 group hover:border-brand-primary/30 transition-all">
-                     <div className="flex justify-between items-start">
-                        <div>
-                           <p className="text-[10px] font-black text-brand-primary uppercase tracking-widest mb-1">{bet.homeTeam} VS {bet.awayTeam}</p>
-                           <p className="text-xs font-bold text-gray-400">Anti-Score: <span className="text-white">{bet.selectedScore}</span></p>
-                        </div>
-                        <div className="text-right">
-                           <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">ROI</p>
-                           <p className="text-sm font-black italic text-brand-primary">{bet.roi.toFixed(2)}%</p>
-                        </div>
-                     </div>
-
-                     <div className="h-px bg-white/5" />
-
-                     <div className="flex justify-between items-end">
-                        <div>
-                           <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">MONTO</p>
-                           <p className="text-base font-black italic text-white">$ {formatCurrency(bet.amount)}</p>
-                        </div>
-                        <div className="text-right">
-                           <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">GANANCIA EST.</p>
-                           <p className="text-base font-black italic text-emerald-400">$ {formatCurrency(bet.amount * bet.roi / 100)}</p>
-                        </div>
-                     </div>
-                  </div>
-               ))}
-            </div>
-         ) : (
-            <div className="flex flex-col items-center justify-center py-20 px-8 text-center bg-black/5 h-full">
-               <div className="w-48 h-48 mb-8 opacity-10 relative">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" className="w-full h-full text-white">
-                     <path d="M7 21v-3m0-15v3m10 12v3m0-15v3m-3.5 1.5l3.5 3.5m-3.5 0l3.5-3.5m-10 10l3.5 3.5m-3.5 0l3.5-3.5" />
-                     <rect x="3" y="3" width="18" height="18" rx="2" />
-                  </svg>
-               </div>
-               <p className="text-lg font-black italic uppercase tracking-widest text-gray-600">{t.noActiveTransactions}</p>
-            </div>
-         )}
-      </div>
+          {/* Transactions List */}
+          <div className="bg-brand-surface rounded-[2.5rem] border border-white/5 shadow-2xl overflow-hidden min-h-[400px]">
+             <div className="p-8 border-b border-white/5">
+                <h3 className="text-xl font-black italic uppercase tracking-tighter text-white">{t.openTransactions}</h3>
+             </div>
+    
+             {openBets.length > 0 ? (
+                <div className="p-6 space-y-4">
+                   {openBets.map((bet) => (
+                      <div key={bet.id} className="bg-black/20 rounded-3xl p-5 border border-white/5 flex flex-col gap-3 group hover:border-brand-primary/30 transition-all">
+                         <div className="flex justify-between items-start">
+                            <div>
+                               <p className="text-[10px] font-black text-brand-primary uppercase tracking-widest mb-1">{bet.homeTeam} VS {bet.awayTeam}</p>
+                               <p className="text-xs font-bold text-gray-400">Anti-Score: <span className="text-white">{bet.selectedScore}</span></p>
+                            </div>
+                            <div className="text-right">
+                               <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">ROI</p>
+                               <p className="text-sm font-black italic text-brand-primary">{bet.roi.toFixed(2)}%</p>
+                            </div>
+                         </div>
+    
+                         <div className="h-px bg-white/5" />
+    
+                         <div className="flex justify-between items-end">
+                            <div>
+                               <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">MONTO</p>
+                               <p className="text-base font-black italic text-white">$ {formatCurrency(bet.amount)}</p>
+                            </div>
+                            <div className="text-right">
+                               <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">GANANCIA EST.</p>
+                               <p className="text-base font-black italic text-emerald-400">$ {formatCurrency(bet.amount * bet.roi / 100)}</p>
+                            </div>
+                         </div>
+                      </div>
+                   ))}
+                </div>
+             ) : (
+                <div className="flex flex-col items-center justify-center py-20 px-8 text-center bg-black/5 h-full">
+                   <div className="w-48 h-48 mb-8 opacity-10 relative overflow-hidden flex items-center justify-center">
+                      <img 
+                        src="https://storage.googleapis.com/test-media-store/6b8d234d-ed12-40de-99f1-610196726884/p-a3967484-904d-4bc5-9c92-3c35b62e49c7.png" 
+                        className="w-full h-full object-contain filter grayscale scale-[2.2] translate-y-[-5%] translate-x-[-15%]" 
+                        alt="Logo" 
+                      />
+                   </div>
+                   <p className="text-lg font-black italic uppercase tracking-widest text-gray-600">{t.noActiveTransactions}</p>
+                </div>
+             )}
+          </div>
     </motion.div>
   );
 }

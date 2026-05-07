@@ -51,6 +51,9 @@ export async function fetchLiveMatches(): Promise<FootballMatch[]> {
     }
 
     const data = await response.json();
+    if (data.warning) {
+      console.warn('Football API Warning:', data.warning);
+    }
     return data.response || [];
   } catch (error) {
     console.error('Error fetching live matches:', error);
@@ -74,6 +77,9 @@ export async function fetchMatchesByDate(date: string): Promise<FootballMatch[]>
     }
 
     const data = await response.json();
+    if (data.warning) {
+      console.warn('Football API Warning:', data.warning);
+    }
     return data.response || [];
   } catch (error) {
     console.error('Error fetching matches by date:', error);
